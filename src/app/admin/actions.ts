@@ -2,7 +2,23 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { categoryRepository } from '@/lib/repositories/category.repository';
+
+export async function loginAdmin(password: string) {
+  // Use a strong alphanumerical secure password
+  if (password === 'LivelyBorg2026AdminX9') {
+    (await cookies()).set('admin_token', 'authenticated', { secure: true, httpOnly: true, path: '/' });
+    return { success: true };
+  }
+  return { success: false, error: 'Invalid password' };
+}
+
+export async function logoutAdmin() {
+  (await cookies()).delete('admin_token');
+  redirect('/admin/login');
+}
+
 import { productRepository } from '@/lib/repositories/product.repository';
 import { blogRepository } from '@/lib/repositories/blog.repository';
 import { offerRepository } from '@/lib/repositories/offer.repository';

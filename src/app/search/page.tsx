@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { searchService, SearchResults as ISearchResults } from "@/lib/services/search.service";
+import { performSearchAction } from "@/app/actions";
 import { SearchResults } from "@/components/search/SearchResults";
 import { Search as SearchIcon, Loader2 } from "lucide-react";
 
@@ -12,7 +12,7 @@ function SearchContent() {
   const initialQuery = searchParams.get("q") || "";
   
   const [query, setQuery] = useState(initialQuery);
-  const [results, setResults] = useState<ISearchResults | null>(null);
+  const [results, setResults] = useState<any | null>(null);
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
@@ -31,7 +31,7 @@ function SearchContent() {
     
     setIsSearching(true);
     try {
-      const searchResults = await searchService.search(searchQuery);
+      const searchResults = await performSearchAction(searchQuery);
       setResults(searchResults);
     } finally {
       setIsSearching(false);

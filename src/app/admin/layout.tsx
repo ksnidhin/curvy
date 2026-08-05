@@ -1,11 +1,19 @@
 import Link from "next/link";
-import { ROUTES } from "@/lib/config/routes";
+import { cookies } from "next/headers";
+import { LogoutButton } from "./components/LogoutButton";
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const isAuthenticated = cookieStore.has('admin_token');
+
+  if (!isAuthenticated) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
@@ -42,7 +50,8 @@ export default function AdminLayout({
           </Link>
         </nav>
 
-        <div className="pt-6 border-t border-gray-200 mt-auto">
+        <div className="pt-6 border-t border-gray-200 mt-auto space-y-4">
+          <LogoutButton />
           <Link 
             href="/" 
             className="flex items-center space-x-3 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"

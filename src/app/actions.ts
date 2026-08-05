@@ -11,3 +11,15 @@ export async function subscribeToNewsletter(email: string) {
     return { success: false, error: "Failed to subscribe" };
   }
 }
+
+import { searchService } from "@/lib/services/search.service";
+
+export async function performSearchAction(query: string) {
+  try {
+    return await searchService.search(query);
+  } catch (error) {
+    console.error("Search failed:", error);
+    return { products: [], categories: [], blogs: [], total: 0 };
+  }
+}
+
