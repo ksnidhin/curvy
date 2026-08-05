@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #FAF7F2;
+  --color-foreground: #2D2A26;
+  --color-card: #FFFFFF;
+  --color-accent: #F5F0EB;
+  --color-muted: #6B6560;
+  --color-sage: #8B9A7B;
+  --color-blush: #C4917B;
+  --color-rose: #D4A59A;
+  --color-border: #E8E2DA;
+
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-heading);
+
+  --radius-card: 12px;
+  --radius-button: 8px;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
