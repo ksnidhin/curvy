@@ -1,7 +1,7 @@
 "use client";
 
 import { Heart } from "lucide-react";
-import { useState } from "react";
+import { useWishlist } from "@/components/wishlist/WishlistContext";
 
 interface WishlistButtonProps {
   productId?: string;
@@ -10,13 +10,14 @@ interface WishlistButtonProps {
 }
 
 export function WishlistButton({ productId, className = "", variant = 'card' }: WishlistButtonProps) {
-  // In Phase 2, this will connect to the actual backend wishlist service
-  const [isSaved, setIsSaved] = useState(false);
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const isSaved = productId ? isInWishlist(productId) : false;
 
   const handleToggle = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent navigation if inside a Link
-    setIsSaved(!isSaved);
-    // TODO: Add toast notification
+    e.preventDefault();
+    if (productId) {
+      toggleWishlist(productId);
+    }
   };
 
   const baseStyles = variant === 'card'

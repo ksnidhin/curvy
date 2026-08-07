@@ -23,3 +23,11 @@ export async function performSearchAction(query: string) {
   }
 }
 
+import { productRepository } from '@/lib/repositories/product.repository';
+
+export async function getProductsByIds(ids: string[]) {
+  if (!ids || ids.length === 0) return [];
+  const products = await productRepository.getAll();
+  return products.filter(p => ids.includes(p.id));
+}
+

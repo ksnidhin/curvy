@@ -1,15 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { Search, Menu } from "lucide-react";
+import { Search, Menu, Heart } from "lucide-react";
 import { ROUTES } from "@/lib/config/routes";
 import { CONSTANTS } from "@/lib/config/constants";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MobileNav } from "./MobileNav";
 import { NavLink } from "@/lib/types/settings";
+import { useWishlist } from "@/components/wishlist/WishlistContext";
 
 export function HeaderClient({ navLinks, siteName }: { navLinks: NavLink[], siteName: string }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { wishlistIds } = useWishlist();
+  
+  // Use state to avoid hydration mismatch
+  const [wishlistCount, setWishlistCount] = useState(0);
+  useEffect(() => {
+    setWishlistCount(wishlistIds.length);
+  }, [wishlistIds]);
 
   return (
     <>
@@ -41,8 +49,16 @@ export function HeaderClient({ navLinks, siteName }: { navLinks: NavLink[], site
             <span className="font-sans text-[11px] text-muted italic tracking-widest mt-1">curated with care</span>
           </Link>
 
-          <div className="flex items-center gap-4">
-            <Link href={ROUTES.search} className="p-2 -mr-2 text-foreground hover:text-sage transition-colors" aria-label="Search">
+          <div className="flex items-center gap-2 md:gap-4">
+            <Link href="/wishlist" className="p-2 text-foreground hover:text-rose transition-colors relative" aria-label="Wishlist">
+              <Heart className="h-5 w-5" />
+              {wishlistCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 bg-rose text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                  {wishlistCount}
+                </span>
+              )}
+            </Link>
+            <Link href={ROUTES.search} className="p-2 -mr-2 md:mr-0 text-foreground hover:text-sage transition-colors" aria-label="Search">
               <Search className="h-5 w-5" />
             </Link>
           </div>

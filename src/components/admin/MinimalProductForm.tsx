@@ -4,13 +4,15 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveMinimalProduct } from '@/app/admin/actions';
 import { Product } from '@/lib/types/product';
+import { Category } from '@/lib/types/category';
 import Image from 'next/image';
 
 interface MinimalProductFormProps {
   initialData?: Product;
+  categories?: Category[];
 }
 
-export function MinimalProductForm({ initialData }: MinimalProductFormProps) {
+export function MinimalProductForm({ initialData, categories = [] }: MinimalProductFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -90,14 +92,12 @@ export function MinimalProductForm({ initialData }: MinimalProductFormProps) {
             <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
             <select
               name="categorySlug"
-              defaultValue={initialData?.categorySlug || 'dresses'}
+              defaultValue={initialData?.categorySlug || categories[0]?.slug || ''}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-sage focus:border-sage"
             >
-              <option value="dresses">Dresses</option>
-              <option value="tops">Tops</option>
-              <option value="jeans">Jeans & Bottoms</option>
-              <option value="kurtis">Kurtis & Traditional</option>
-              <option value="nightwear">Nightwear</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.slug}>{cat.name}</option>
+              ))}
             </select>
           </div>
           <div>

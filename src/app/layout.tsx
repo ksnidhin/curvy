@@ -22,6 +22,7 @@ import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { BottomTabBar } from "@/components/layout/BottomTabBar";
+import { WishlistProvider } from "@/components/wishlist/WishlistContext";
 
 export default function RootLayout({
   children,
@@ -31,13 +32,15 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${tenorSans.variable} ${jost.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans bg-background text-foreground">
-        <AnnouncementBar />
-        <Header />
-        <main className="flex-1 flex flex-col">
-          {children}
-        </main>
-        <Footer />
-        <BottomTabBar />
+        <WishlistProvider>
+          <AnnouncementBar />
+          <Header />
+          <main className="flex-1 flex flex-col">
+            {children}
+          </main>
+          <Footer />
+          <BottomTabBar />
+        </WishlistProvider>
       </body>
     </html>
   );

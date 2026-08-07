@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { productRepository } from "@/lib/repositories/product.repository";
+import { categoryRepository } from "@/lib/repositories/category.repository";
 import { notFound } from "next/navigation";
 import { MinimalProductForm } from "@/components/admin/MinimalProductForm";
 
@@ -12,6 +13,8 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     notFound();
   }
 
+  const categories = await categoryRepository.getAll();
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center gap-4 mb-8">
@@ -21,7 +24,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         <h1 className="text-3xl font-heading text-gray-900">Edit Product: {product.title}</h1>
       </div>
 
-      <MinimalProductForm initialData={product} />
+      <MinimalProductForm initialData={product} categories={categories} />
     </div>
   );
 }
