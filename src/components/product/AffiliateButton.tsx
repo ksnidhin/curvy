@@ -24,7 +24,7 @@ export async function AffiliateButton({ productSlug, storeName, offers }: Affili
             rel="noopener noreferrer"
             className="flex items-center justify-between w-full bg-sage hover:bg-sage/90 text-white px-6 py-4 rounded-[var(--radius-button)] font-medium transition-colors shadow-sm text-lg"
           >
-            <span>View on {offer.storeId}</span>
+            <span>View on {storeName}</span>
             <div className="flex items-center gap-4">
               <span className="font-bold">₹{offer.price}</span>
               <ExternalLink className="h-5 w-5" />

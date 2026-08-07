@@ -329,12 +329,15 @@ export async function saveMinimalProduct(formData: FormData) {
     const clothType = formData.get('clothType') as string;
     const occasion = formData.get('occasion') as string;
 
+    const storeName = formData.get('storeName') as string;
+
     const productData: any = {
       title,
       brand: formData.get('brand') as string,
       categorySlug: formData.get('categorySlug') as string,
       description: formData.get('description') as string,
       status: 'published',
+      storeName,
       attributes: {
         availableSizes,
         colors,
@@ -419,7 +422,6 @@ export async function saveMinimalProduct(formData: FormData) {
     // Handle single Offer for pricing and stock
     const inStock = formData.get('inStock') === 'true';
     const price = parseFloat(formData.get('price') as string);
-    const storeName = formData.get('storeName') as string;
     const affiliateUrl = formData.get('affiliateUrl') as string;
 
     // We must import offerRepository at the top, but we'll assume it's already there since this file has saveAdvancedProduct.
