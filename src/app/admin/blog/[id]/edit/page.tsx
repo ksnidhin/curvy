@@ -3,9 +3,10 @@ import Link from "next/link";
 import { blogRepository } from "@/lib/repositories/blog.repository";
 import { notFound } from "next/navigation";
 
-export default async function EditBlogPage({ params }: { params: { id: string } }) {
+export default async function EditBlogPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const posts = await blogRepository.getAll();
-  const post = posts.find(p => p.id === params.id);
+  const post = posts.find(p => p.id === id);
 
   if (!post) {
     notFound();

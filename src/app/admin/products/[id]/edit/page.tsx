@@ -3,9 +3,10 @@ import { productRepository } from "@/lib/repositories/product.repository";
 import { notFound } from "next/navigation";
 import { MinimalProductForm } from "@/components/admin/MinimalProductForm";
 
-export default async function EditProductPage({ params }: { params: { id: string } }) {
+export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const products = await productRepository.getAll();
-  const product = products.find(p => p.id === params.id);
+  const product = products.find(p => p.id === id);
 
   if (!product) {
     notFound();
