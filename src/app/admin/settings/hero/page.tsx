@@ -75,7 +75,17 @@ export default function HeroSettingsPage() {
       if (res.success) {
         setSuccess('Hero images updated successfully!');
         setRemovedImages([]);
-        // Re-fetch to clear blob URLs and use real URLs
+        
+        // Re-fetch latest settings to update UI
+        fetch('/api/settings')
+          .then(r => r.json())
+          .then(data => {
+            if (data && data.heroImages) {
+              setInitialImages(data.heroImages);
+              setPreviewUrls(data.heroImages.map((url: string) => ({ url, isExisting: true })));
+            }
+          });
+          
         router.refresh();
       } else {
         setError(res.error || 'Failed to save images');

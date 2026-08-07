@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { settingsRepository } from '@/lib/repositories/settings.repository';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const settings = await settingsRepository.getSiteSettings();
