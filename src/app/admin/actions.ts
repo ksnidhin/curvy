@@ -426,3 +426,76 @@ export async function saveMinimalProduct(formData: FormData) {
     return { success: false, error: error.message || "An unexpected error occurred" };
   }
 }
+
+export async function saveMinimalCategory(formData: FormData) {
+  try {
+    const id = formData.get('id') as string | null;
+    const name = formData.get('name') as string;
+    const slug = formData.get('slug') as string;
+    const description = formData.get('description') as string;
+
+    const categoryData: any = {
+      name,
+      slug,
+      description
+    };
+
+    // Handle File Upload
+    const imageFile = formData.get('imageFile') as File | null;
+    if (imageFile && imageFile.size > 0) {
+      const bytes = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      
+      const fileName = `cat-${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '')}`;
+      const uploadDir = path.join(process.cwd(), 'public/images/categories');
+      
+      try {
+        await fs.access(uploadDir);
+      } catch {
+        await fs.mkdir(uploadDir, { recursive: true });
+      }
+      
+      const filePath = path.join(uploadDir, fileName);
+      await fs.writeFile(filePath, buffer);
+      
+      categoryData.image = {
+        url: `/images/categories/${fileName}`,
+        alt: name
+      };
+    } else if (!id) {
+      categoryData.image = {
+        url: "/images/categories/placeholder.jpg",
+        alt: name
+      };
+    }
+
+    let savedCategory;
+    if (id) {
+      if (!categoryData.image) {
+        const existing = await categoryRepository.getById(id);
+        if (existing?.image) {
+          categoryData.image = existing.image;
+        }
+      }
+      savedCategory = await categoryRepository.update(id, categoryData);
+    } else {
+      categoryData.id = `cat-${Date.now()}`;
+      savedCategory = await categoryRepository.create(categoryData);
+    }
+
+    if (!savedCategory) {
+      return { success: false, error: 'Failed to save category' };
+    }
+
+    // Revalidate Cache
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath('/admin/categories');
+    revalidatePath('/categories');
+    revalidatePath('/');
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Minimal category save error:", error);
+    return { success: false, error: error.message || "An unexpected error occurred" };
+  }
+}
