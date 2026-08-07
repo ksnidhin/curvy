@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ROUTES } from '@/lib/config/routes';
 
 export function WishlistGrid() {
-  const { wishlistIds } = useWishlist();
+  const { wishlistIds, setWishlistIds } = useWishlist();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,6 +24,12 @@ export function WishlistGrid() {
       try {
         const data = await getProductsByIds(wishlistIds);
         setProducts(data);
+        
+        // Clean up any IDs that no longer exist in the database
+        if (data.length !== wishlistIds.length) {
+          const validIds = data.map(p => p.id);
+          setWishlistIds(validIds);
+        }
       } catch (e) {
         console.error('Failed to load wishlist products', e);
       } finally {

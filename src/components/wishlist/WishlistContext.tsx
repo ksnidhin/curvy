@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface WishlistContextType {
   wishlistIds: string[];
+  setWishlistIds: (ids: string[]) => void;
   toggleWishlist: (productId: string) => void;
   isInWishlist: (productId: string) => boolean;
 }
@@ -49,7 +50,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <WishlistContext.Provider value={{ wishlistIds, toggleWishlist, isInWishlist }}>
+    <WishlistContext.Provider value={{ wishlistIds, setWishlistIds, toggleWishlist, isInWishlist }}>
       {children}
     </WishlistContext.Provider>
   );

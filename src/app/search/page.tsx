@@ -4,7 +4,8 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { performSearchAction } from "@/app/actions";
 import { SearchResults } from "@/components/search/SearchResults";
-import { Search as SearchIcon, Loader2 } from "lucide-react";
+import { Search as SearchIcon, Loader2 } from "lucide-react";import { filterAndSortProducts } from "@/lib/utils/filter-products";
+import { FilterToggle } from "@/components/ui/FilterToggle";
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -45,6 +46,18 @@ function SearchContent() {
     }
   };
 
+  // Convert ReadonlyURLSearchParams to standard object for the helper
+  const parsedSearchParams: { [key: string]: string | undefined } = {};
+  searchParams.forEach((value, key) => {
+    parsedSearchParams[key] = value;
+  });
+
+  const filteredProducts = results?.products 
+    ? filterAndSortProducts(results.products, parsedSearchParams)
+    : [];
+
+  const displayResults = results ? { ...results, products: filteredProducts } : null;
+
   return (
     <div className="container mx-auto px-4 py-8 md:py-16 max-w-5xl min-h-[60vh]">
       <div className="max-w-2xl mx-auto mb-12">
@@ -72,8 +85,15 @@ function SearchContent() {
         <div className="flex justify-center items-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-sage" />
         </div>
-      ) : results ? (
-        <SearchResults results={results} query={initialQuery} />
+      ) : displayResults ? (
+        <>
+          {displayResults.products.length > 0 && (
+            <div className="flex justify-end mb-6">
+              <FilterToggle />
+            </div>
+          )}
+          <SearchResults results={displayResults} query={initialQuery} />
+        </>
       ) : (
         <div className="text-center text-muted py-20">
           Enter a search term above to find curated fashion and styling advice.
