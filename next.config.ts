@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   serverActions: {
-    bodySizeLimit: '10mb',
+    bodySizeLimit: '50mb',
   },
 };
 
