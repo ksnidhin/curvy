@@ -48,6 +48,9 @@ export class ProductRepository implements IProductRepository {
       };
     }
     
+    // Guarantee numeric price to prevent UI crashes if data is malformed
+    product.price = product.price || 0;
+    
     return product;
   }
 
