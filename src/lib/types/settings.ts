@@ -17,4 +17,5 @@ export interface SiteSettings {
   navigation?: NavLink[];
   footerLinks?: FooterSection[];
   socialLinks?: NavLink[];
+  heroImages?: string[];
 }

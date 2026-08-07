@@ -74,6 +74,13 @@ export function AdminSidebar() {
           >
             Blog
           </Link>
+          <Link 
+            href="/admin/settings/hero" 
+            onClick={() => setIsOpen(false)}
+            className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors"
+          >
+            Hero Slider
+          </Link>
         </nav>
 
         <div className="pt-6 border-t border-gray-200 mt-auto space-y-4">

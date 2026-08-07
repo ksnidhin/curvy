@@ -346,31 +346,57 @@ export async function saveMinimalProduct(formData: FormData) {
       }
     };
 
-    // Handle File Upload
-    const imageFile = formData.get('imageFile') as File | null;
-    if (imageFile && imageFile.size > 0) {
-      const bytes = await imageFile.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      
-      const fileName = `${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '')}`;
-      const uploadDir = path.join(process.cwd(), 'public/images/products');
-      
-      try {
-        await fs.access(uploadDir);
-      } catch {
-        await fs.mkdir(uploadDir, { recursive: true });
+    // Handle File Uploads
+    const imageFiles = formData.getAll('imageFiles') as File[];
+    const removedImages = formData.getAll('removedImages') as string[];
+    
+    // Start with existing images if editing
+    let currentImages: any[] = [];
+    if (id) {
+      const existing = await productRepository.getById(id);
+      if (existing?.images) {
+        currentImages = [...existing.images];
       }
-      
-      const filePath = path.join(uploadDir, fileName);
-      await fs.writeFile(filePath, buffer);
-      
-      productData.images = [{
-        id: fileName,
-        url: `/images/products/${fileName}`,
-        alt: title,
-        isPrimary: true,
-        order: 0
-      }];
+    }
+
+    // Remove deleted images
+    if (removedImages.length > 0) {
+      currentImages = currentImages.filter(img => {
+        const url = typeof img === 'string' ? img : img.url;
+        return !removedImages.includes(url);
+      });
+    }
+
+    // Add new images
+    for (const imageFile of imageFiles) {
+      if (imageFile && imageFile.size > 0) {
+        const bytes = await imageFile.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        
+        const fileName = `${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '')}`;
+        const uploadDir = path.join(process.cwd(), 'public/images/products');
+        
+        try {
+          await fs.access(uploadDir);
+        } catch {
+          await fs.mkdir(uploadDir, { recursive: true });
+        }
+        
+        const filePath = path.join(uploadDir, fileName);
+        await fs.writeFile(filePath, buffer);
+        
+        currentImages.push({
+          id: fileName,
+          url: `/images/products/${fileName}`,
+          alt: title,
+          isPrimary: currentImages.length === 0,
+          order: currentImages.length
+        });
+      }
+    }
+
+    if (currentImages.length > 0) {
+      productData.images = currentImages;
     }
 
     // Save core product
@@ -502,6 +528,55 @@ export async function saveMinimalCategory(formData: FormData) {
     return { success: true };
   } catch (error: any) {
     console.error("Minimal category save error:", error);
+    return { success: false, error: error.message || "An unexpected error occurred" };
+  }
+}
+
+export async function saveHeroImages(formData: FormData) {
+  try {
+    const { settingsRepository } = await import('@/lib/repositories/settings.repository');
+    const imageFiles = formData.getAll('imageFiles') as File[];
+    const removedImages = formData.getAll('removedImages') as string[];
+    
+    const settings = await settingsRepository.getSiteSettings();
+    let currentImages = [...(settings.heroImages || [])];
+
+    // Remove deleted images
+    if (removedImages.length > 0) {
+      currentImages = currentImages.filter(url => !removedImages.includes(url));
+    }
+
+    // Add new images
+    for (const imageFile of imageFiles) {
+      if (imageFile && imageFile.size > 0) {
+        const bytes = await imageFile.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        
+        const fileName = `hero-${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '')}`;
+        const uploadDir = path.join(process.cwd(), 'public/images/hero');
+        
+        try {
+          await fs.access(uploadDir);
+        } catch {
+          await fs.mkdir(uploadDir, { recursive: true });
+        }
+        
+        const filePath = path.join(uploadDir, fileName);
+        await fs.writeFile(filePath, buffer);
+        
+        currentImages.push(`/images/hero/${fileName}`);
+      }
+    }
+
+    await settingsRepository.updateSiteSettings({ heroImages: currentImages });
+
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath('/');
+    revalidatePath('/admin/settings/hero');
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Hero images save error:", error);
     return { success: false, error: error.message || "An unexpected error occurred" };
   }
 }

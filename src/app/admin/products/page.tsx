@@ -53,7 +53,7 @@ export default async function AdminProducts() {
                   </div>
                 </td>
                 <td className="px-6 py-4 font-medium text-gray-900">
-                  ${product.price.toFixed(2)}
+                  {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(product.price)}
                 </td>
                 <td className="px-6 py-4">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">

@@ -1,8 +1,23 @@
+'use client';
+
 import Link from "next/link";
 import Image from "next/image";
 import { ROUTES } from "@/lib/config/routes";
+import { useState, useEffect } from "react";
 
-export function HeroSection() {
+export function HeroSection({ heroImages }: { heroImages: string[] }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (heroImages.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % heroImages.length);
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [heroImages]);
+
   return (
     <section className="relative overflow-hidden border-b border-border/30">
       <div className="container mx-auto px-4 md:px-8 max-w-7xl">
@@ -43,18 +58,39 @@ export function HeroSection() {
             </div>
           </div>
           
-          {/* Editorial Image */}
+          {/* Editorial Image Slider */}
           <div className="w-full md:w-[55%] lg:w-[60%] flex justify-end">
             <div className="relative w-full aspect-[4/5] md:aspect-[3/4] max-w-2xl rounded-[32px] overflow-hidden bg-accent shadow-sm">
-              <Image
-                src="/images/products/floral-dress-1.jpg"
-                alt="Editorial shot of a curvy woman wearing a floral wrap dress"
-                fill
-                className="object-cover object-[center_20%] sepia-[.10] saturate-[.90] contrast-[.95] brightness-[1.02]"
-                priority
-                sizes="(max-width: 768px) 100vw, 60vw"
-              />
+              {heroImages.map((src, index) => (
+                <Image
+                  key={src}
+                  src={src}
+                  alt="Editorial shot of a curvy woman"
+                  fill
+                  className={`object-cover object-[center_20%] sepia-[.10] saturate-[.90] contrast-[.95] brightness-[1.02] transition-opacity duration-1000 ease-in-out ${
+                    index === currentIndex ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  priority={index === 0}
+                  sizes="(max-width: 768px) 100vw, 60vw"
+                />
+              ))}
               <div className="absolute inset-0 bg-gradient-to-tr from-[#C4917B]/10 to-transparent mix-blend-overlay pointer-events-none" />
+              
+              {/* Slider Indicators */}
+              {heroImages.length > 1 && (
+                <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 z-20">
+                  {heroImages.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentIndex(idx)}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        idx === currentIndex ? 'w-6 bg-white' : 'w-2 bg-white/50'
+                      }`}
+                      aria-label={`Go to slide ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

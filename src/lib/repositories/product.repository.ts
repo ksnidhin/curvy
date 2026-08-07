@@ -6,6 +6,7 @@ import { storeRepository } from "./store.repository";
 export interface IProductRepository {
   getAll(): Promise<Product[]>;
   getBySlug(slug: string): Promise<Product | null>;
+  getById(id: string): Promise<Product | null>;
   getFeatured(limit?: number): Promise<Product[]>;
   getByCategory(categorySlug: string): Promise<Product[]>;
   getRelated(productSlug: string, limit?: number): Promise<Product[]>;
@@ -63,6 +64,11 @@ export class ProductRepository implements IProductRepository {
   async getBySlug(slug: string): Promise<Product | null> {
     const products = await this.getAll(); // getAll now hydrates
     return products.find(p => p.slug === slug) || null;
+  }
+
+  async getById(id: string): Promise<Product | null> {
+    const products = await this.getAll();
+    return products.find(p => p.id === id) || null;
   }
 
   async getFeatured(limit = 4): Promise<Product[]> {

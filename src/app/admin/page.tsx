@@ -58,7 +58,9 @@ export default async function AdminDashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="font-medium text-gray-900">${product.price.toFixed(2)}</span>
+                  <span className="font-medium text-gray-900">
+                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(product.price)}
+                  </span>
                   <Link href={`/admin/products/${product.id}/edit`} className="text-sage hover:text-sage/80 font-medium text-sm">
                     Edit
                   </Link>

@@ -17,15 +17,35 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [inStock, setInStock] = useState(initialData?.inStock ?? true);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(
-    initialData?.images?.[0]?.url || (typeof initialData?.images?.[0] === 'string' ? initialData.images[0] : null)
+  const [previewUrls, setPreviewUrls] = useState<{url: string, file?: File, isExisting?: boolean}[]>(
+    initialData?.images?.map(img => {
+      const url = typeof img === 'string' ? img : img.url;
+      return { url, isExisting: true };
+    }) || []
   );
+  const [removedImages, setRemovedImages] = useState<string[]>([]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setPreviewUrl(URL.createObjectURL(file));
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      const newPreviews = files.map(file => ({
+        url: URL.createObjectURL(file),
+        file
+      }));
+      setPreviewUrls(prev => [...prev, ...newPreviews]);
     }
+    // Clear input so same files can be selected again if removed
+    e.target.value = '';
+  };
+
+  const removeImage = (index: number) => {
+    setPreviewUrls(prev => {
+      const target = prev[index];
+      if (target.isExisting) {
+        setRemovedImages(curr => [...curr, target.url]);
+      }
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -40,6 +60,21 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
         formData.append('id', initialData.id);
       }
       
+      // Append files that were added
+      previewUrls.forEach(preview => {
+        if (preview.file) {
+          formData.append('imageFiles', preview.file);
+        }
+      });
+
+      // Append removed existing images
+      removedImages.forEach(url => {
+        formData.append('removedImages', url);
+      });
+      
+      // We don't want the default single file upload to interfere
+      formData.delete('imageFile');
+
       const res = await saveMinimalProduct(formData);
       
       if (res.success) {
@@ -222,22 +257,37 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
 
         {/* Media Upload */}
         <div className="pt-6 border-t border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Product Image</h3>
-          <div className="flex items-start space-x-6">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Upload File</label>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Product Images</h3>
+          <div className="flex flex-col space-y-6">
+            <div className="w-full">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Upload Files</label>
               <input
                 type="file"
                 name="imageFile"
                 accept="image/*"
+                multiple
                 onChange={handleImageChange}
                 className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sage/10 file:text-sage hover:file:bg-sage/20"
               />
-              <p className="mt-2 text-xs text-gray-500">Upload a square or portrait image (JPG, PNG).</p>
+              <p className="mt-2 text-xs text-gray-500">Upload multiple square or portrait images (JPG, PNG).</p>
             </div>
-            {previewUrl && (
-              <div className="relative w-32 h-40 rounded-md overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
-                <Image src={previewUrl} alt="Preview" fill className="object-cover" />
+            
+            {previewUrls.length > 0 && (
+              <div className="flex flex-wrap gap-4">
+                {previewUrls.map((preview, idx) => (
+                  <div key={idx} className="relative w-32 h-40 shrink-0 flex flex-col gap-2">
+                    <div className="relative w-full h-full rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+                      <Image src={preview.url} alt={`Preview ${idx + 1}`} fill className="object-cover" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeImage(idx)}
+                      className="text-xs text-red-600 hover:text-red-800 font-medium text-center w-full"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
