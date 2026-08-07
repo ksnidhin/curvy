@@ -134,5 +134,11 @@
       }
     ],
     "affiliateUrl": "https://amazon.in/high-rise-jeans"
+  },
+  {
+    "id": "frock-test",
+    "title": "Frock",
+    "price": 200,
+    "inStock": false
   }
 ]

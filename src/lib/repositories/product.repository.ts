@@ -23,6 +23,11 @@ export class ProductRepository implements IProductRepository {
   }
 
   private async hydrateProduct(product: Product): Promise<Product> {
+    // Ensure slug exists (Next.js 15 bug fix fallback)
+    if (!product.slug && product.title) {
+      product.slug = product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    }
+
     const offers = await offerRepository.getByProductId(product.id);
     
     if (offers && offers.length > 0) {
@@ -43,10 +48,6 @@ export class ProductRepository implements IProductRepository {
       };
     }
     
-    // Fallback to original mock properties if no offers exist yet
-    if (!product.slug && product.title) {
-      product.slug = product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-    }
     return product;
   }
 

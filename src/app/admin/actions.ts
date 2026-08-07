@@ -475,7 +475,9 @@ export async function saveMinimalCategory(formData: FormData) {
 
     let savedCategory;
     if (id) {
-      if (!categoryData.image) {
+      if (formData.get('removeImage') === 'true') {
+        categoryData.image = null;
+      } else if (!categoryData.image) {
         const existing = await categoryRepository.getById(id);
         if (existing?.image) {
           categoryData.image = existing.image;

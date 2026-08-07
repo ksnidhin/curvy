@@ -26,12 +26,22 @@ export function MinimalCategoryForm({ initialData }: MinimalCategoryFormProps) {
     : initialData?.image?.url;
     
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialImageUrl || null);
+  const [removeImage, setRemoveImage] = useState(false);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setPreviewUrl(URL.createObjectURL(file));
+      setRemoveImage(false);
     }
+  };
+
+  const handleRemoveImage = () => {
+    setPreviewUrl(null);
+    setRemoveImage(true);
+    // Also clear the file input if needed
+    const fileInput = document.querySelector('input[name="imageFile"]') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -43,6 +53,9 @@ export function MinimalCategoryForm({ initialData }: MinimalCategoryFormProps) {
       const formData = new FormData(e.currentTarget);
       if (initialData?.id) {
         formData.append('id', initialData.id);
+      }
+      if (removeImage) {
+        formData.append('removeImage', 'true');
       }
       
       const res = await saveMinimalCategory(formData);
@@ -121,8 +134,17 @@ export function MinimalCategoryForm({ initialData }: MinimalCategoryFormProps) {
               <p className="mt-2 text-xs text-gray-500">Upload a square or portrait image (JPG, PNG).</p>
             </div>
             {previewUrl && (
-              <div className="relative w-32 h-40 rounded-md overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
-                <Image src={previewUrl} alt="Preview" fill className="object-cover" />
+              <div className="relative w-32 h-40 shrink-0 flex flex-col gap-2">
+                <div className="relative w-full h-full rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+                  <Image src={previewUrl} alt="Preview" fill className="object-cover" />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="text-xs text-red-600 hover:text-red-800 font-medium text-center w-full"
+                >
+                  Remove Image
+                </button>
               </div>
             )}
           </div>
