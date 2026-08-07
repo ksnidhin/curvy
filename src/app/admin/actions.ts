@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { categoryRepository } from '@/lib/repositories/category.repository';
+import fs from 'fs/promises';
+import path from 'path';
 
 export async function loginAdmin(password: string) {
   // Use a strong alphanumerical secure password
@@ -313,4 +315,114 @@ export async function updateBlogPost(id: string, formData: FormData) {
   }
   
   redirect('/admin/blog');
+}
+
+export async function saveMinimalProduct(formData: FormData) {
+  try {
+    const id = formData.get('id') as string | null;
+    const title = formData.get('title') as string;
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    
+    // Parse filters
+    const availableSizes = (formData.get('availableSizes') as string)?.split(',').map(s => s.trim()).filter(Boolean) || [];
+    const colors = (formData.get('colors') as string)?.split(',').map(s => s.trim()).filter(Boolean) || [];
+    const clothType = formData.get('clothType') as string;
+    const occasion = formData.get('occasion') as string;
+
+    const productData: any = {
+      title,
+      slug: id ? undefined : slug,
+      brand: formData.get('brand') as string,
+      categorySlug: formData.get('categorySlug') as string,
+      description: formData.get('description') as string,
+      status: 'published',
+      attributes: {
+        availableSizes,
+        colors,
+        clothType,
+        occasion
+      },
+      seo: {
+        metaTitle: title
+      }
+    };
+
+    // Handle File Upload
+    const imageFile = formData.get('imageFile') as File | null;
+    if (imageFile && imageFile.size > 0) {
+      const bytes = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      
+      const fileName = `${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '')}`;
+      const uploadDir = path.join(process.cwd(), 'public/images/products');
+      
+      try {
+        await fs.access(uploadDir);
+      } catch {
+        await fs.mkdir(uploadDir, { recursive: true });
+      }
+      
+      const filePath = path.join(uploadDir, fileName);
+      await fs.writeFile(filePath, buffer);
+      
+      productData.images = [{
+        id: fileName,
+        url: `/images/products/${fileName}`,
+        alt: title,
+        isPrimary: true,
+        order: 0
+      }];
+    }
+
+    // Save core product
+    let savedProduct;
+    if (id) {
+      savedProduct = await productRepository.update(id, productData);
+    } else {
+      savedProduct = await productRepository.create(productData);
+    }
+
+    if (!savedProduct) {
+      return { success: false, error: 'Failed to save product' };
+    }
+
+    // Handle single Offer for pricing and stock
+    const inStock = formData.get('inStock') === 'true';
+    const price = parseFloat(formData.get('price') as string);
+    const storeName = formData.get('storeName') as string;
+    const affiliateUrl = formData.get('affiliateUrl') as string;
+
+    // We must import offerRepository at the top, but we'll assume it's already there since this file has saveAdvancedProduct.
+    const { offerRepository } = await import('@/lib/repositories/offer.repository');
+
+    const existingOffers = await offerRepository.getByProductId(savedProduct.id);
+    const defaultOfferId = existingOffers?.[0]?.id;
+
+    const offerData = {
+      productId: savedProduct.id,
+      storeId: 'default-store',
+      url: affiliateUrl,
+      affiliateUrl: affiliateUrl,
+      price: price,
+      inStock: inStock,
+      syncStatus: 'success'
+    };
+
+    if (defaultOfferId) {
+      await offerRepository.update(defaultOfferId, offerData);
+    } else {
+      await offerRepository.create(offerData as any);
+    }
+
+    // Revalidate Cache
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath('/admin/products');
+    revalidatePath('/products');
+    revalidatePath('/');
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Minimal product save error:", error);
+    return { success: false, error: error.message || "An unexpected error occurred" };
+  }
 }
