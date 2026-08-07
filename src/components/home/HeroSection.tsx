@@ -13,7 +13,7 @@ export function HeroSection({ heroImages }: { heroImages: string[] }) {
     
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % heroImages.length);
-    }, 5000);
+    }, 8000);
     
     return () => clearInterval(interval);
   }, [heroImages]);
@@ -60,14 +60,14 @@ export function HeroSection({ heroImages }: { heroImages: string[] }) {
           
           {/* Editorial Image Slider */}
           <div className="w-full md:w-[55%] lg:w-[60%] flex justify-end">
-            <div className="relative w-full aspect-[4/5] md:aspect-[3/4] max-w-2xl rounded-[32px] overflow-hidden bg-accent shadow-sm">
+            <div className="relative w-full aspect-[4/5] md:aspect-[3/4] max-w-2xl rounded-[32px] overflow-hidden bg-accent shadow-sm group">
               {heroImages.map((src, index) => (
                 <Image
                   key={src}
                   src={src}
                   alt="Editorial shot of a curvy woman"
                   fill
-                  className={`object-cover object-[center_20%] sepia-[.10] saturate-[.90] contrast-[.95] brightness-[1.02] transition-opacity duration-1000 ease-in-out ${
+                  className={`object-cover object-[center_20%] sepia-[.10] saturate-[.90] contrast-[.95] brightness-[1.02] transition-opacity duration-[2000ms] ease-in-out ${
                     index === currentIndex ? 'opacity-100' : 'opacity-0'
                   }`}
                   priority={index === 0}
@@ -76,6 +76,22 @@ export function HeroSection({ heroImages }: { heroImages: string[] }) {
               ))}
               <div className="absolute inset-0 bg-gradient-to-tr from-[#C4917B]/10 to-transparent mix-blend-overlay pointer-events-none" />
               
+              {/* Hidden Manual Slide Buttons (Clickable Left/Right Sides) */}
+              {heroImages.length > 1 && (
+                <>
+                  <button 
+                    onClick={() => setCurrentIndex((prev) => (prev === 0 ? heroImages.length - 1 : prev - 1))}
+                    className="absolute inset-y-0 left-0 w-1/3 z-10 cursor-pointer opacity-0"
+                    aria-label="Previous image"
+                  />
+                  <button 
+                    onClick={() => setCurrentIndex((prev) => (prev + 1) % heroImages.length)}
+                    className="absolute inset-y-0 right-0 w-1/3 z-10 cursor-pointer opacity-0"
+                    aria-label="Next image"
+                  />
+                </>
+              )}
+
               {/* Slider Indicators */}
               {heroImages.length > 1 && (
                 <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 z-20">
