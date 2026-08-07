@@ -76,7 +76,7 @@ export async function Footer() {
         
         <div className="mt-16 pt-8 border-t border-border/50 text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted">
           <p>&copy; {new Date().getFullYear()} {settings.siteName || CONSTANTS.SITE_NAME}. All rights reserved.</p>
-          <p className="max-w-xl text-center md:text-right">We participate in affiliate programs and may earn a commission on purchases made through our links.</p>
+          <p className="max-w-xl text-center md:text-right">{settings.affiliateDisclosureText || "2026 Curvy Girls. As an affiliate partner, we may earn commission from qualifying purchases at no extra cost to you."}</p>
         </div>
       </div>
     </footer>

@@ -112,19 +112,7 @@ export default function ContactPage() {
                   <a href="mailto:hello@curvygirls.com" className="font-medium text-foreground hover:text-sage transition-colors">hello@curvygirls.com</a>
                 </div>
               </div>
-
-              <div className="flex gap-4">
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow-sm text-sage">
-                  <MapPin className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="font-heading text-lg text-foreground mb-1">Our Location</h3>
-                  <p className="text-muted text-sm mb-1">We are a digital-first team based in</p>
-                  <p className="font-medium text-foreground">Mumbai, India</p>
-                </div>
-              </div>
             </div>
-            
             <div className="mt-12 pt-8 border-t border-border">
               <h3 className="font-heading text-lg text-foreground mb-4">Follow our journey</h3>
               <div className="flex gap-4">

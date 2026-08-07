@@ -1,7 +1,7 @@
 {
   "siteName": "Curvy Girls",
-  "announcementText": "Honest picks. No sales. We earn commission.",
-  "affiliateDisclosureText": "As an affiliate, we may earn a commission from qualifying purchases at no extra cost to you.",
+  "announcementText": "Honest picks. Handpicked for you.",
+  "affiliateDisclosureText": "2026 Curvy Girls. As an affiliate partner, we may earn commission from qualifying purchases at no extra cost to you.",
   "navigation": [
     {
       "label": "Home",
@@ -72,11 +72,15 @@
   "socialLinks": [
     {
       "label": "Instagram",
-      "href": "https://instagram.com"
+      "href": "https://www.instagram.com/curvy_girls.in"
     },
     {
       "label": "Pinterest",
-      "href": "https://pinterest.com"
+      "href": "https://pin.it/hcVMc2iI7"
+    },
+    {
+      "label": "YouTube",
+      "href": "https://youtube.com/@curvygirlsin?si=avI57avTMmhrtl5p"
     }
   ]
 }

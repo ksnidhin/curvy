@@ -2,7 +2,7 @@ import { settingsRepository } from "@/lib/repositories/settings.repository";
 
 export async function AnnouncementBar() {
   const settings = await settingsRepository.getSiteSettings();
-  const text = settings?.announcementText || "Honest picks. No sales. We earn commission.";
+  const text = settings?.announcementText || "Honest picks. Handpicked for you.";
 
   if (!text) return null;
 
