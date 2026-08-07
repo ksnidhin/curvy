@@ -331,7 +331,6 @@ export async function saveMinimalProduct(formData: FormData) {
 
     const productData: any = {
       title,
-      slug: id ? undefined : slug,
       brand: formData.get('brand') as string,
       categorySlug: formData.get('categorySlug') as string,
       description: formData.get('description') as string,
@@ -377,8 +376,13 @@ export async function saveMinimalProduct(formData: FormData) {
     // Save core product
     let savedProduct;
     if (id) {
+      const existing = await productRepository.getById(id);
+      if (existing && !existing.slug) {
+        productData.slug = slug;
+      }
       savedProduct = await productRepository.update(id, productData);
     } else {
+      productData.slug = slug;
       savedProduct = await productRepository.create(productData);
     }
 

@@ -44,6 +44,9 @@ export class ProductRepository implements IProductRepository {
     }
     
     // Fallback to original mock properties if no offers exist yet
+    if (!product.slug && product.title) {
+      product.slug = product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    }
     return product;
   }
 
