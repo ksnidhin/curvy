@@ -66,8 +66,8 @@ export function MinimalCategoryForm({ initialData }: MinimalCategoryFormProps) {
         setError(res.error || 'Failed to save category');
         setIsSubmitting(false);
       }
-    } catch (err) {
-      setError('An unexpected error occurred');
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred');
       setIsSubmitting(false);
     }
   };

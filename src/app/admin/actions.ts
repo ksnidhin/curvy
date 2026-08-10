@@ -379,7 +379,8 @@ export async function saveMinimalProduct(formData: FormData) {
         const bytes = await imageFile.arrayBuffer();
         const buffer = Buffer.from(bytes);
         
-        const fileName = `${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '')}`;
+        const safeName = imageFile.name ? imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '') : 'upload.jpg';
+        const fileName = `${Date.now()}-${safeName}`;
         const uploadDir = path.join(process.cwd(), 'public/images/products');
         
         try {
@@ -481,7 +482,8 @@ export async function saveMinimalCategory(formData: FormData) {
       const bytes = await imageFile.arrayBuffer();
       const buffer = Buffer.from(bytes);
       
-      const fileName = `cat-${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '')}`;
+      const safeName = imageFile.name ? imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '') : 'upload.jpg';
+      const fileName = `cat-${Date.now()}-${safeName}`;
       const uploadDir = path.join(process.cwd(), 'public/images/categories');
       
       try {
@@ -557,7 +559,8 @@ export async function saveHeroImages(formData: FormData) {
         const bytes = await imageFile.arrayBuffer();
         const buffer = Buffer.from(bytes);
         
-        const fileName = `hero-${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '')}`;
+        const safeName = imageFile.name ? imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '') : 'upload.jpg';
+        const fileName = `hero-${Date.now()}-${safeName}`;
         const uploadDir = path.join(process.cwd(), 'public/images/hero');
         
         try {
