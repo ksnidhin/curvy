@@ -369,9 +369,12 @@ export async function saveMinimalProduct(formData: FormData) {
         return !removedImages.includes(url);
       });
     }
+    
+    console.log("saveMinimalProduct received imageFiles count:", imageFiles.length);
 
     // Add new images
     for (const imageFile of imageFiles) {
+      console.log("Processing imageFile:", typeof imageFile, imageFile ? imageFile.name : 'null', imageFile ? imageFile.size : 0);
       if (imageFile && imageFile.size > 0) {
         const bytes = await imageFile.arrayBuffer();
         const buffer = Buffer.from(bytes);
