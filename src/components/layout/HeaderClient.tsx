@@ -47,7 +47,7 @@ export function HeaderClient({ navLinks, siteName }: { navLinks: NavLink[], site
           <Link href={ROUTES.home} className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center leading-none mt-1 whitespace-nowrap z-10">
             <div className="flex items-center gap-2 md:gap-3">
               <img 
-                src="/images/curvy-girls-logo.svg" 
+                src="/images/curvy-girls-logo.png" 
                 alt="Logo" 
                 className="h-14 sm:h-16 md:h-20 w-auto shrink-0 object-contain"
               />
