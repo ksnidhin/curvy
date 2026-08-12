@@ -61,6 +61,13 @@ export function AdminSidebar() {
             Products
           </Link>
           <Link 
+            href="/admin/import" 
+            onClick={() => setIsOpen(false)}
+            className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors"
+          >
+            Import from Link
+          </Link>
+          <Link 
             href="/admin/categories" 
             onClick={() => setIsOpen(false)}
             className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors"
