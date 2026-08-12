@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 210" fill="none">
+  <!-- Hair pink streak -->
+  <path d="M48,25 C43,35 46,50 53,60 C56,50 58,40 48,25 Z" fill="#f4d1db"/>
+  
+  <!-- Hair base -->
+  <path d="M53,18 C38,15 33,35 40,48 C33,55 43,65 50,58 C53,55 56,50 53,45 C63,40 68,55 63,65 C70,60 73,45 63,30 C63,22 58,18 53,18 Z" fill="#111111"/>
+  
+  <!-- Face/Jawline outline -->
+  <path d="M50,38 C53,48 56,52 60,48" stroke="#111111" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Left Sleeve (viewer left) -->
+  <path d="M48,60 C33,65 18,85 23,105 C33,95 38,95 43,95 Z" fill="#f4d1db"/>
+  <!-- Right Sleeve (viewer right) -->
+  <path d="M58,60 C73,65 88,85 83,105 C73,95 68,95 63,95 Z" fill="#f4d1db"/>
+  
+  <!-- Bodice (V-neck simulation) -->
+  <path d="M43,60 L53,100 L38,100 Z" fill="#f4d1db"/>
+  <path d="M63,60 L53,100 L68,100 Z" fill="#f4d1db"/>
+  
+  <!-- Skirt left -->
+  <path d="M38,105 C28,130 43,195 53,200 C56,160 53,130 53,105 Z" fill="#f4d1db"/>
+  <!-- Skirt right / Slit inner -->
+  <path d="M68,105 C78,130 63,195 53,200 C60,160 63,130 53,105 Z" fill="#c35b71"/>
+  
+  <!-- Line Art Strokes -->
+  <g stroke="#111111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Left Arm/Sleeve -->
+    <path d="M48,60 C33,65 18,85 23,105 C33,95 38,95 43,95"/>
+    
+    <!-- Right Arm/Sleeve -->
+    <path d="M58,60 C73,65 88,85 83,105 C73,95 68,95 63,95"/>
+    
+    <!-- V-neck -->
+    <path d="M43,60 C48,80 53,100 53,100 C53,100 58,80 63,60"/>
+    
+    <!-- Waistband -->
+    <path d="M38,100 C48,98 58,98 68,100"/>
+    <path d="M38,105 C48,103 58,103 68,105"/>
+    
+    <!-- Skirt Outer Hips -->
+    <path d="M38,105 C28,130 43,195 53,205"/>
+    <path d="M68,105 C78,130 63,195 53,190"/>
+    
+    <!-- Slit line -->
+    <path d="M53,105 C58,140 63,170 53,205"/>
+  </g>
+</svg>
