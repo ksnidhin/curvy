@@ -402,6 +402,50 @@ export async function saveMinimalProduct(formData: FormData) {
       }
     }
 
+    // Handle external images
+    const externalImages = formData.getAll('externalImages') as string[];
+    if (externalImages.length > 0) {
+      console.log("saveMinimalProduct downloading external images:", externalImages.length);
+      for (const imageUrl of externalImages) {
+        if (!imageUrl) continue;
+        try {
+          // Use realistic headers to avoid blocking
+          const res = await fetch(imageUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+            }
+          });
+          if (!res.ok) continue;
+          
+          const arrayBuffer = await res.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          
+          const fileName = `${Date.now()}-ext-${Math.floor(Math.random() * 10000)}.jpg`;
+          const uploadDir = path.join(process.cwd(), 'public/images/products');
+          
+          try {
+            await fs.access(uploadDir);
+          } catch {
+            await fs.mkdir(uploadDir, { recursive: true });
+          }
+          
+          const filePath = path.join(uploadDir, fileName);
+          await fs.writeFile(filePath, buffer);
+          
+          currentImages.push({
+            id: fileName,
+            url: `/images/products/${fileName}`,
+            alt: title,
+            isPrimary: currentImages.length === 0,
+            order: currentImages.length
+          });
+        } catch (err) {
+          console.error("Failed to download external image:", imageUrl, err);
+        }
+      }
+    }
+
     if (currentImages.length > 0) {
       productData.images = currentImages;
     }

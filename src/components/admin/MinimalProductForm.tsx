@@ -17,13 +17,74 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [inStock, setInStock] = useState(initialData?.inStock ?? true);
-  const [previewUrls, setPreviewUrls] = useState<{url: string, file?: File, isExisting?: boolean}[]>(
+  const [previewUrls, setPreviewUrls] = useState<{url: string, file?: File, isExisting?: boolean, isExternal?: boolean}[]>(
     initialData?.images?.map(img => {
       const url = typeof img === 'string' ? img : img.url;
       return { url, isExisting: true };
     }) || []
   );
   const [removedImages, setRemovedImages] = useState<string[]>([]);
+  
+  const [fetchUrl, setFetchUrl] = useState('');
+  const [isFetching, setIsFetching] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+  
+  const [formDataState, setFormDataState] = useState({
+    title: initialData?.title || '',
+    brand: initialData?.brand || '',
+    description: initialData?.description || '',
+    price: initialData?.price || '',
+    affiliateUrl: initialData?.affiliateUrl || '',
+    storeName: initialData?.storeName || '',
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormDataState(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleFetch = async () => {
+    if (!fetchUrl) return;
+    setIsFetching(true);
+    setFetchError('');
+    try {
+      const res = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: fetchUrl })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch');
+      
+      let derivedStore = '';
+      try {
+        const hostname = new URL(fetchUrl).hostname.replace('www.', '');
+        derivedStore = hostname.split('.')[0];
+        derivedStore = derivedStore.charAt(0).toUpperCase() + derivedStore.slice(1);
+      } catch(e) {}
+      
+      setFormDataState(prev => ({
+        ...prev,
+        title: data.title || prev.title,
+        description: data.description || prev.description,
+        price: data.price || prev.price,
+        affiliateUrl: fetchUrl,
+        storeName: derivedStore || prev.storeName,
+      }));
+      
+      if (data.images && data.images.length > 0) {
+        const newPreviews = data.images.map((url: string) => ({
+          url,
+          isExternal: true
+        }));
+        setPreviewUrls(prev => [...prev, ...newPreviews]);
+      }
+    } catch (err: any) {
+      setFetchError(err.message);
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -64,6 +125,8 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
       previewUrls.forEach(preview => {
         if (preview.file) {
           formData.append('imageFiles', preview.file);
+        } else if (preview.isExternal) {
+          formData.append('externalImages', preview.url);
         }
       });
 
@@ -102,6 +165,30 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
           </div>
         )}
 
+        {/* Autofetch from Link */}
+        <div className="bg-sage/5 p-4 rounded-md border border-sage/20 mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Auto-fill from Supplier Link</label>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="Paste Amazon, Flipkart, Myntra link here..."
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-sage focus:border-sage"
+              value={fetchUrl}
+              onChange={(e) => setFetchUrl(e.target.value)}
+              disabled={isFetching}
+            />
+            <button
+              type="button"
+              onClick={handleFetch}
+              disabled={isFetching || !fetchUrl}
+              className="px-4 py-2 bg-sage text-white rounded-md hover:bg-sage/90 disabled:opacity-50 transition-colors whitespace-nowrap"
+            >
+              {isFetching ? 'Fetching...' : 'Fetch Data'}
+            </button>
+          </div>
+          {fetchError && <p className="text-red-500 text-xs mt-2">{fetchError}</p>}
+        </div>
+
         {/* Basic Info */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div>
@@ -110,7 +197,8 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
               type="text"
               name="title"
               required
-              defaultValue={initialData?.title}
+              value={formDataState.title}
+              onChange={handleInputChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-sage focus:border-sage"
             />
           </div>
@@ -119,7 +207,8 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
             <input
               type="text"
               name="brand"
-              defaultValue={initialData?.brand}
+              value={formDataState.brand}
+              onChange={handleInputChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-sage focus:border-sage"
             />
           </div>
@@ -155,7 +244,8 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
           <textarea
             name="description"
             rows={4}
-            defaultValue={initialData?.description}
+            value={formDataState.description}
+            onChange={handleInputChange}
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-sage focus:border-sage"
           />
         </div>
@@ -208,7 +298,8 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
                 step="0.01"
                 name="price"
                 required
-                defaultValue={initialData?.price}
+                value={formDataState.price}
+                onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-sage focus:border-sage"
               />
             </div>
@@ -219,7 +310,8 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
                 name="storeName"
                 placeholder="e.g. Myntra, Amazon"
                 required
-                defaultValue={initialData?.storeName}
+                value={formDataState.storeName}
+                onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-sage focus:border-sage"
               />
             </div>
@@ -230,7 +322,8 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
                 name="affiliateUrl"
                 placeholder="https://"
                 required
-                defaultValue={initialData?.affiliateUrl}
+                value={formDataState.affiliateUrl}
+                onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-sage focus:border-sage"
               />
             </div>
