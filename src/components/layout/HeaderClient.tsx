@@ -49,7 +49,7 @@ export function HeaderClient({ navLinks, siteName }: { navLinks: NavLink[], site
               <img 
                 src="/images/curvy-girls-logo.png" 
                 alt="Logo" 
-                className="h-14 sm:h-16 md:h-20 w-auto shrink-0 object-contain"
+                className="h-14 sm:h-16 md:h-20 w-auto shrink-0 object-contain translate-y-[2px] md:translate-y-[3px]"
               />
               <span className="font-heading text-2xl md:text-[1.75rem] tracking-tight text-foreground">{siteName}</span>
             </div>
