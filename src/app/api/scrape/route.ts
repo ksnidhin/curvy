@@ -38,7 +38,11 @@ export async function POST(req: Request) {
 
     if (domain.includes('amazon') || domain.includes('amzn')) {
       title = $('#productTitle').text().trim() || $('meta[property="og:title"]').attr('content') || $('title').text();
-      const priceWhole = $('.a-price-whole').first().text().replace(/[^0-9]/g, '');
+      let priceWhole = $('.a-price-whole').map((_, el) => $(el).text()).get().find(t => t.trim().length > 0) || '';
+      priceWhole = priceWhole.replace(/[^0-9]/g, '');
+      if (!priceWhole) {
+        priceWhole = $('.apexPriceToPay .a-offscreen').first().text().replace(/[^0-9]/g, '');
+      }
       price = priceWhole;
       description = $('#productDescription').text().trim() || $('#feature-bullets').text().trim() || $('meta[property="og:description"]').attr('content') || '';
       
