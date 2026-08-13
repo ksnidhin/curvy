@@ -71,8 +71,12 @@ export async function POST(req: Request) {
       
       images = [...new Set(images)].filter(img => !img.includes('icon') && !img.includes('transparent'));
       
-      if (!price && !scraperApiKey && (title.includes('Amazon.in') || title.includes('Robot Check') || title === '')) {
-        throw new Error('Amazon anti-bot protection prevented scraping. Please configure ScraperAPI.');
+      if (!price && (title.includes('Amazon.in') || title.includes('Robot Check') || title === '')) {
+        if (!scraperApiKey) {
+          throw new Error('Amazon anti-bot protection prevented scraping. Please configure ScraperAPI.');
+        } else {
+          throw new Error('Failed to extract product data. The link might be invalid, expired, or a CAPTCHA page.');
+        }
       }
     } else if (domain.includes('flipkart')) {
       title = $('.B_NuCI').text().trim() || $('.VU-ZEz').text().trim();
