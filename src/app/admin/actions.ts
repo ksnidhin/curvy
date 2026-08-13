@@ -446,9 +446,7 @@ export async function saveMinimalProduct(formData: FormData) {
       }
     }
 
-    if (currentImages.length > 0) {
-      productData.images = currentImages;
-    }
+    productData.images = currentImages;
 
     // Save core product
     let savedProduct;
