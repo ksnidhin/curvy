@@ -1,4 +1,4 @@
-const url = 'https://www.amazon.in/dp/B0CHX1W1XY';
+const url = 'https://amzn.in/d/0e9R1qLq';
 const scraperApiKey = '17b71d086ce0859b314187fdbd489745';
 const fetchUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}`;
 

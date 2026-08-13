@@ -30,6 +30,7 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
       try {
         const hostname = new URL(fetchUrl).hostname.replace('www.', '');
         derivedStore = hostname.split('.')[0];
+        if (derivedStore === 'amzn') derivedStore = 'amazon';
         derivedStore = derivedStore.charAt(0).toUpperCase() + derivedStore.slice(1);
       } catch(e) {}
       
@@ -69,6 +70,7 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
               className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-sage focus:border-sage"
               value={fetchUrl}
               onChange={(e) => setFetchUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !isFetching && fetchUrl && handleFetch()}
               disabled={isFetching}
             />
             <button
