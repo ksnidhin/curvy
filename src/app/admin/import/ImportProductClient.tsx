@@ -39,6 +39,11 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
         price: data.price || '',
         affiliateUrl: fetchUrl,
         storeName: derivedStore || '',
+        brand: data.brand || '',
+        colors: data.colors || '',
+        availableSizes: data.availableSizes || '',
+        clothType: data.clothType || '',
+        occasion: data.occasion || '',
         images: (data.images || []).map((url: string) => ({ url })) // MinimalProductForm handles strings/objects
       };
       
