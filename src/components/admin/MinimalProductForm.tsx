@@ -20,7 +20,8 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
   const [previewUrls, setPreviewUrls] = useState<{url: string, file?: File, isExisting?: boolean, isExternal?: boolean}[]>(
     initialData?.images?.map(img => {
       const url = typeof img === 'string' ? img : img.url;
-      return { url, isExisting: true };
+      const isExternal = url.startsWith('http');
+      return { url, isExisting: !isExternal, isExternal };
     }) || []
   );
   const [removedImages, setRemovedImages] = useState<string[]>([]);
