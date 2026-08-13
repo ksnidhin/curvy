@@ -42,17 +42,28 @@ export async function POST(req: Request) {
       price = priceWhole;
       description = $('#productDescription').text().trim() || $('#feature-bullets').text().trim() || $('meta[property="og:description"]').attr('content') || '';
       
-      const imageScript = $('script').filter((_, el) => $(el).text().includes('ImageBlockATF')).text();
-      const match = imageScript.match(/"colorImages":\s*{\s*"initial":\s*(\[.*?\])/);
-      if (match) {
-        try {
-          const imgData = JSON.parse(match[1]);
-          images = imgData.map((img: any) => img.hiRes || img.large).filter(Boolean);
-        } catch(e) {}
+      // Try finding high-res images in the DOM
+      $('#altImages img, .a-dynamic-image').each((_, el) => {
+        let src = $(el).attr('src') || $(el).data('old-hires') || $(el).attr('data-src');
+        if (src && src.startsWith('http')) {
+          src = src.replace(/\._.*?\_\./, '.');
+          images.push(src);
+        }
+      });
+
+      if (!images.length) {
+        const imageScript = $('script').filter((_, el) => $(el).text().includes('ImageBlockATF') || $(el).text().includes('colorImages')).text();
+        const match = imageScript.match(/"hiRes":"(.*?)"/g);
+        if (match) {
+          images = match.map(m => m.replace(/"hiRes":"/, '').replace(/"$/, ''));
+        }
       }
+
       if (!images.length) {
         images = [$('#landingImage').attr('src'), $('meta[property="og:image"]').attr('content')].filter(Boolean) as string[];
       }
+      
+      images = [...new Set(images)].filter(img => !img.includes('icon') && !img.includes('transparent'));
       
       if (!price && !scraperApiKey && (title.includes('Amazon.in') || title.includes('Robot Check') || title === '')) {
         throw new Error('Amazon anti-bot protection prevented scraping. Please configure ScraperAPI.');
