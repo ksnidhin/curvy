@@ -87,6 +87,60 @@ export async function POST(req: Request) {
         const src = $(el).attr('src');
         if (src) images.push(src.replace('128/128', '832/832').replace('128/128', '832/832'));
       });
+    } else if (domain.includes('myntra')) {
+      title = $('meta[property="og:title"]').attr('content') || $('title').text();
+      description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
+      
+      const priceText = $('.pdp-price').text().replace(/[^0-9]/g, '') || $('meta[property="product:price:amount"]').attr('content');
+      if (priceText) price = priceText;
+
+      const startIndex = html.indexOf('window.__myx = ');
+      if (startIndex !== -1) {
+        const jsonStart = startIndex + 'window.__myx = '.length;
+        const endIndex = html.indexOf('</script>', jsonStart);
+        if (endIndex !== -1) {
+          let jsonString = html.substring(jsonStart, endIndex).trim();
+          if (jsonString.endsWith(';')) jsonString = jsonString.slice(0, -1);
+          try {
+            const data = JSON.parse(jsonString);
+            const product = data?.pdpData;
+            if (product?.media?.albums?.[0]?.images) {
+              const parsedImages = product.media.albums[0].images.map((img: any) => img.imageURL);
+              if (parsedImages.length) {
+                images.push(...parsedImages);
+              }
+            }
+          } catch (e) {
+            console.error('Failed to parse Myntra state');
+          }
+        }
+      }
+    } else if (domain.includes('meesho')) {
+      title = $('meta[property="og:title"]').attr('content') || $('title').text();
+      description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
+      
+      const possiblePrices = $('.price, [class*="Price"], [class*="pdp-price"], .discounted-price, h4').map((_, el) => $(el).text()).get();
+      for (const p of possiblePrices) {
+        if (p.includes('₹')) {
+           const num = p.replace(/[^0-9]/g, '');
+           if (num && parseInt(num) > 0) { price = num; break; }
+        }
+      }
+
+      const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/);
+      if (nextDataMatch) {
+        try {
+          const data = JSON.parse(nextDataMatch[1]);
+          const productImages = data?.props?.pageProps?.initialState?.product?.details?.data?.images;
+          if (Array.isArray(productImages)) {
+            // Remove thumbnail suffixes like _128.jpg, _512.jpg to get the highest resolution available
+            const highResImages = productImages.map((url: string) => url.replace(/_\d+\.(jpg|jpeg|png)$/i, '.$1'));
+            images.push(...highResImages);
+          }
+        } catch (e) {
+          console.error('Failed to parse Meesho next data');
+        }
+      }
     } else {
       // Generic fallback
       title = $('meta[property="og:title"]').attr('content') || $('title').text();
