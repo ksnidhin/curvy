@@ -10,8 +10,13 @@ export async function POST(req: Request) {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.9',
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Upgrade-Insecure-Requests': '1',
+      'Cache-Control': 'max-age=0',
     };
 
     const response = await fetch(url, { headers, next: { revalidate: 0 } });
@@ -27,13 +32,14 @@ export async function POST(req: Request) {
     let description = '';
     let images: string[] = [];
 
-    const domain = new URL(url).hostname;
+    const finalUrl = response.url || url;
+    const domain = new URL(finalUrl).hostname;
 
-    if (domain.includes('amazon')) {
-      title = $('#productTitle').text().trim();
+    if (domain.includes('amazon') || domain.includes('amzn')) {
+      title = $('#productTitle').text().trim() || $('meta[property="og:title"]').attr('content') || $('title').text();
       const priceWhole = $('.a-price-whole').first().text().replace(/[^0-9]/g, '');
       price = priceWhole;
-      description = $('#productDescription').text().trim() || $('#feature-bullets').text().trim();
+      description = $('#productDescription').text().trim() || $('#feature-bullets').text().trim() || $('meta[property="og:description"]').attr('content') || '';
       
       // Amazon images are often in a script tag
       const imageScript = $('script').filter((_, el) => $(el).text().includes('ImageBlockATF')).text();
@@ -45,7 +51,11 @@ export async function POST(req: Request) {
         } catch(e) {}
       }
       if (!images.length) {
-        images = [$('#landingImage').attr('src')].filter(Boolean) as string[];
+        images = [$('#landingImage').attr('src'), $('meta[property="og:image"]').attr('content')].filter(Boolean) as string[];
+      }
+      
+      if (!price && (title.includes('Amazon.in') || title.includes('Robot Check') || title === '')) {
+        throw new Error('Amazon anti-bot protection prevented scraping. Please enter details manually.');
       }
     } else if (domain.includes('flipkart')) {
       title = $('.B_NuCI').text().trim() || $('.VU-ZEz').text().trim();
