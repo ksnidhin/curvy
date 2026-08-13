@@ -6,12 +6,24 @@ export async function POST(req: Request) {
     const { url } = await req.json();
     if (!url) return NextResponse.json({ error: 'URL is required' }, { status: 400 });
 
+    let finalUrlToScrape = url;
+
+    // Expand shortlinks manually before sending to ScraperAPI to avoid redirects/captchas
+    if (url.includes('amzn.in') || url.includes('link.amazon') || url.includes('amzn.to')) {
+      try {
+        const expandRes = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+        if (expandRes.url) finalUrlToScrape = expandRes.url;
+      } catch (e) {
+        // Fallback to original url if expansion fails
+      }
+    }
+
     const scraperApiKey = process.env.SCRAPERAPI_KEY;
     const groqApiKey = process.env.GROQ_API_KEY;
     
-    let fetchUrl = url;
+    let fetchUrl = finalUrlToScrape;
     if (scraperApiKey) {
-      fetchUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}`;
+      fetchUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(finalUrlToScrape)}`;
     }
 
     const headers = {

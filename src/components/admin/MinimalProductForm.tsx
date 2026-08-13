@@ -283,7 +283,7 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
                 {previewUrls.map((preview, idx) => (
                   <div key={idx} className="relative w-32 h-40 shrink-0 flex flex-col gap-2">
                     <div className="relative w-full h-full rounded-md overflow-hidden bg-gray-100 border border-gray-200">
-                      <Image src={preview.url} alt={`Preview ${idx + 1}`} fill className="object-cover" />
+                      <img src={preview.url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
                     </div>
                     <button
                       type="button"
