@@ -41,5 +41,5 @@ yarn-error.log*
 next-env.d.ts
 
 # Production Data
-data/data.json
+data/*.json
 public/images/products/
