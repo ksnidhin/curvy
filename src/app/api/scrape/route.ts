@@ -34,6 +34,7 @@ export async function POST(req: Request) {
     let price = '';
     let description = '';
     let images: string[] = [];
+    let extractedDetails: any = {};
     
     // We parse the original URL domain, not scraperapi's domain
     const domain = new URL(url).hostname;
@@ -112,19 +113,18 @@ export async function POST(req: Request) {
                 }
               }
               
-              // Append structured data to description so AI can extract it perfectly
               if (product.brand?.name) {
-                description += `\nBrand: ${product.brand.name}`;
+                extractedDetails.brand = product.brand.name;
               }
               if (product.sizes && Array.isArray(product.sizes)) {
                 const sizeLabels = product.sizes.map((s: any) => s.label).filter(Boolean).join(', ');
-                if (sizeLabels) description += `\nAvailable Sizes: ${sizeLabels}`;
+                if (sizeLabels) extractedDetails.availableSizes = sizeLabels;
               }
               if (product.articleAttributes) {
-                const attrs = Object.entries(product.articleAttributes)
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join(', ');
-                description += `\nProduct Attributes: ${attrs}`;
+                const attrs = product.articleAttributes;
+                if (attrs['Fabric']) extractedDetails.clothType = attrs['Fabric'];
+                if (attrs['Base Color'] || attrs['Colour']) extractedDetails.colors = attrs['Base Color'] || attrs['Colour'];
+                if (attrs['Occasion']) extractedDetails.occasion = attrs['Occasion'];
               }
               if (product.price?.discounted) {
                 price = product.price.discounted.toString();
@@ -162,7 +162,7 @@ export async function POST(req: Request) {
             
             // Append structured details to description
             if (detailsData.validSizes && Array.isArray(detailsData.validSizes)) {
-               description += `\nAvailable Sizes: ${detailsData.validSizes.join(', ')}`;
+               extractedDetails.availableSizes = detailsData.validSizes.join(', ');
             }
             if (detailsData.price && detailsData.price > 0 && !price) {
                price = detailsData.price.toString();
@@ -250,6 +250,15 @@ Return ONLY a valid JSON object with the following keys. If a value is completel
         console.error("Groq AI Error:", err);
       }
     }
+
+    // Merge precise extracted details over AI's guesses
+    aiData = {
+      brand: extractedDetails.brand || aiData.brand,
+      availableSizes: extractedDetails.availableSizes || aiData.availableSizes,
+      colors: extractedDetails.colors || aiData.colors,
+      clothType: extractedDetails.clothType || aiData.clothType,
+      occasion: extractedDetails.occasion || aiData.occasion
+    };
 
     return NextResponse.json({
       title,
