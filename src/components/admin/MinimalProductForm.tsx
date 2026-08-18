@@ -26,7 +26,16 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
   );
   const [removedImages, setRemovedImages] = useState<string[]>([]);
   
+  const PRESET_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "6XL", "7XL", "8XL"];
+  const [selectedSizes, setSelectedSizes] = useState<string[]>(
+    initialData?.attributes?.availableSizes || []
+  );
 
+  const toggleSize = (size: string) => {
+    setSelectedSizes(prev => 
+      prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+    );
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -170,16 +179,26 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
         {/* Filters (Sizes, Colors, Fabric) */}
         <div className="pt-6 border-t border-gray-200">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Filters</h3>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Available Sizes (comma separated)</label>
-              <input
-                type="text"
-                name="availableSizes"
-                placeholder="XS, S, M, L, XL"
-                defaultValue={initialData?.attributes?.availableSizes?.join(', ')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-sage focus:border-sage"
-              />
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Available Sizes</label>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_SIZES.map(size => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => toggleSize(size)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                      selectedSizes.includes(size)
+                        ? 'bg-sage text-white border-sage'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-sage'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+              <input type="hidden" name="availableSizes" value={selectedSizes.join(',')} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Colors (comma separated)</label>

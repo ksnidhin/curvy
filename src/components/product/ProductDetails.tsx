@@ -16,22 +16,23 @@ export function ProductDetails({ attributes, details }: ProductDetailsProps) {
       <h3 className="font-heading text-xl text-foreground mb-4">Details</h3>
       <ul className="space-y-3">
         {Object.entries(displayData).map(([key, value]) => {
-          if (!value) return null;
-          // Capitalize first letter of key
-          const formattedKey = key.charAt(0).toUpperCase() + key.slice(1);
+          if (!value || (Array.isArray(value) && value.length === 0)) return null;
+          
+          // Format key: camelCase to Title Case (e.g., availableSizes -> Available Sizes)
+          const formattedKey = key
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/^./, str => str.toUpperCase());
+          
+          const displayValue = Array.isArray(value) ? value.join(', ') : value;
           
           return (
             <li key={key} className="text-sm flex gap-2">
-              <span className="font-medium text-foreground min-w-[80px]">• {formattedKey}:</span>
-              <span className="text-muted">{value}</span>
+              <span className="font-medium text-foreground min-w-[120px]">• {formattedKey}:</span>
+              <span className="text-muted flex-1">{displayValue as React.ReactNode}</span>
             </li>
           );
         })}
       </ul>
-      
-      <button className="flex items-center gap-1 text-sm font-medium text-foreground hover:text-sage transition-colors mt-6">
-        See more <ChevronDown className="h-4 w-4" />
-      </button>
     </div>
   );
 }

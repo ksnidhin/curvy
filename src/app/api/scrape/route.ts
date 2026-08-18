@@ -169,6 +169,9 @@ export async function POST(req: Request) {
     description = description.replace(/\s+/g, ' ').trim().substring(0, 1500);
     images = [...new Set(images)].slice(0, 5);
     
+    // Extract a larger chunk of text from the body to give the AI more context (for sizes, colors, fabric)
+    const bodyText = $('body').text().replace(/\s+/g, ' ').substring(0, 6000);
+
     // --- GROQ AI EXTRACTION ---
     let aiData = { brand: '', availableSizes: '', colors: '', clothType: '', occasion: '' };
     
@@ -177,18 +180,22 @@ export async function POST(req: Request) {
         const Groq = (await import('groq-sdk')).default;
         const groq = new Groq({ apiKey: groqApiKey });
         
-        // We feed the AI the title and description to extract features
-        const prompt = `You are a fashion e-commerce assistant. Extract the following details from this product info:
+        // We feed the AI the title, description, and body text to extract features
+        const prompt = `You are an expert fashion e-commerce data extraction assistant. Extract the product details from the following information. Look closely at the Raw Page Text for available sizes, colors, and fabric material.
+
 Title: ${title}
 Description: ${description}
 
-Return ONLY a valid JSON object with the following keys. If a value is unknown, return an empty string. Do not include markdown formatting or backticks.
+Raw Page Text (snippet):
+${bodyText}
+
+Return ONLY a valid JSON object with the following keys. If a value is completely unknown, return an empty string. Do NOT include markdown formatting, backticks, or explanations.
 {
-  "brand": "Brand Name",
-  "availableSizes": "S, M, L, XL", // Comma separated string
-  "colors": "Red, Blue", // Comma separated string
-  "clothType": "Cotton, Silk, etc.",
-  "occasion": "Casual, Formal, Party, Ethnic"
+  "brand": "Extract the brand name if visible, else empty",
+  "availableSizes": "Extract all available sizes (e.g. S, M, L, XL, 2XL) and return them as a comma-separated string",
+  "colors": "Extract the color(s) of the product and return as a comma-separated string",
+  "clothType": "Extract the fabric or material type (e.g. Cotton, Polyester, Georgette)",
+  "occasion": "Guess the best occasion from: Casual, Formal, Party, Ethnic"
 }`;
 
         const chatCompletion = await groq.chat.completions.create({
@@ -206,7 +213,7 @@ Return ONLY a valid JSON object with the following keys. If a value is unknown, 
           availableSizes: parsed.availableSizes || '',
           colors: parsed.colors || '',
           clothType: parsed.clothType || '',
-          occasion: parsed.occasion || ''
+          occasion: parsed.occasion?.toLowerCase() || ''
         };
       } catch(err) {
         console.error("Groq AI Error:", err);
