@@ -122,9 +122,24 @@ export async function POST(req: Request) {
               }
               if (product.articleAttributes) {
                 const attrs = product.articleAttributes;
-                if (attrs['Fabric']) extractedDetails.clothType = attrs['Fabric'];
-                if (attrs['Base Color'] || attrs['Colour']) extractedDetails.colors = attrs['Base Color'] || attrs['Colour'];
+                
+                const fabric = attrs['Fabric'] || attrs['Top Fabric'] || attrs['Bottom Fabric'] || attrs['Material'];
+                if (fabric) extractedDetails.clothType = fabric;
+                
+                const color = attrs['Base Color'] || attrs['Colour'] || attrs['Color'];
+                if (color) extractedDetails.colors = color;
+                
                 if (attrs['Occasion']) extractedDetails.occasion = attrs['Occasion'];
+                
+                // Append remaining interesting attributes to the description for the user's reference
+                const excludedKeys = ['Fabric', 'Top Fabric', 'Bottom Fabric', 'Material', 'Base Color', 'Colour', 'Color', 'Occasion'];
+                const extraAttrs = Object.entries(attrs)
+                  .filter(([k]) => !excludedKeys.includes(k))
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join(', ');
+                if (extraAttrs) {
+                  description += `\n\nAdditional Details: ${extraAttrs}`;
+                }
               }
               if (product.price?.discounted) {
                 price = product.price.discounted.toString();
