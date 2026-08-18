@@ -104,10 +104,30 @@ export async function POST(req: Request) {
           try {
             const data = JSON.parse(jsonString);
             const product = data?.pdpData;
-            if (product?.media?.albums?.[0]?.images) {
-              const parsedImages = product.media.albums[0].images.map((img: any) => img.imageURL);
-              if (parsedImages.length) {
-                images.push(...parsedImages);
+            if (product) {
+              if (product.media?.albums?.[0]?.images) {
+                const parsedImages = product.media.albums[0].images.map((img: any) => img.imageURL);
+                if (parsedImages.length) {
+                  images.push(...parsedImages);
+                }
+              }
+              
+              // Append structured data to description so AI can extract it perfectly
+              if (product.brand?.name) {
+                description += `\nBrand: ${product.brand.name}`;
+              }
+              if (product.sizes && Array.isArray(product.sizes)) {
+                const sizeLabels = product.sizes.map((s: any) => s.label).filter(Boolean).join(', ');
+                if (sizeLabels) description += `\nAvailable Sizes: ${sizeLabels}`;
+              }
+              if (product.articleAttributes) {
+                const attrs = Object.entries(product.articleAttributes)
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join(', ');
+                description += `\nProduct Attributes: ${attrs}`;
+              }
+              if (product.price?.discounted) {
+                price = product.price.discounted.toString();
               }
             }
           } catch (e) {
@@ -131,11 +151,22 @@ export async function POST(req: Request) {
       if (nextDataMatch) {
         try {
           const data = JSON.parse(nextDataMatch[1]);
-          const productImages = data?.props?.pageProps?.initialState?.product?.details?.data?.images;
-          if (Array.isArray(productImages)) {
-            // Remove thumbnail suffixes like _128.jpg, _512.jpg to get the highest resolution available
-            const highResImages = productImages.map((url: string) => url.replace(/_\d+\.(jpg|jpeg|png)$/i, '.$1'));
-            images.push(...highResImages);
+          const detailsData = data?.props?.pageProps?.initialState?.product?.details?.data;
+          
+          if (detailsData) {
+            const productImages = detailsData.images;
+            if (Array.isArray(productImages)) {
+              const highResImages = productImages.map((url: string) => url.replace(/_\d+\.(jpg|jpeg|png)$/i, '.$1'));
+              images.push(...highResImages);
+            }
+            
+            // Append structured details to description
+            if (detailsData.validSizes && Array.isArray(detailsData.validSizes)) {
+               description += `\nAvailable Sizes: ${detailsData.validSizes.join(', ')}`;
+            }
+            if (detailsData.price && detailsData.price > 0 && !price) {
+               price = detailsData.price.toString();
+            }
           }
         } catch (e) {
           console.error('Failed to parse Meesho next data');

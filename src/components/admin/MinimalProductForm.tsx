@@ -27,9 +27,21 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
   const [removedImages, setRemovedImages] = useState<string[]>([]);
   
   const PRESET_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "6XL", "7XL", "8XL"];
-  const [selectedSizes, setSelectedSizes] = useState<string[]>(
-    initialData?.attributes?.availableSizes || []
-  );
+  
+  const normalizedInitialSizes = (initialData?.attributes?.availableSizes || []).map((s: string) => {
+    // Map common words to acronyms to match PRESET_SIZES
+    const upper = s.toUpperCase().trim();
+    if (upper === 'SMALL') return 'S';
+    if (upper === 'MEDIUM') return 'M';
+    if (upper === 'LARGE') return 'L';
+    if (upper === 'EXTRA LARGE') return 'XL';
+    return upper;
+  });
+
+  const [selectedSizes, setSelectedSizes] = useState<string[]>(normalizedInitialSizes);
+
+  // Combine PRESET_SIZES with any custom sizes that were imported so they are visible
+  const allDisplaySizes = Array.from(new Set([...PRESET_SIZES, ...selectedSizes]));
 
   const toggleSize = (size: string) => {
     setSelectedSizes(prev => 
@@ -183,7 +195,7 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">Available Sizes</label>
               <div className="flex flex-wrap gap-2">
-                {PRESET_SIZES.map(size => (
+                {allDisplaySizes.map(size => (
                   <button
                     key={size}
                     type="button"
