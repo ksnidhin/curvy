@@ -9,11 +9,31 @@ export async function POST(req: Request) {
     const scraperApiKey = process.env.SCRAPERAPI_KEY;
     const groqApiKey = process.env.GROQ_API_KEY;
     
-    let fetchUrl = url;
+    let finalUrl = url;
+
+    // Resolve short URLs BEFORE sending to ScraperAPI
+    if (url.includes('amzn.in') || url.includes('amzn.to')) {
+      try {
+        const redirectRes = await fetch(url, {
+          method: 'GET',
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+          }
+        });
+        if (redirectRes.url) {
+          finalUrl = redirectRes.url;
+        }
+      } catch (err) {
+        console.error('Failed to resolve Amazon short URL:', err);
+      }
+    }
+
+    let fetchUrl = finalUrl;
     if (scraperApiKey) {
-      const isAmazon = url.includes('amazon') || url.includes('amzn');
+      const isAmazon = finalUrl.includes('amazon') || finalUrl.includes('amzn');
       const premiumFlag = isAmazon ? '&premium=true' : '';
-      fetchUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}${premiumFlag}`;
+      fetchUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(finalUrl)}${premiumFlag}`;
     }
 
     const headers = {
@@ -24,6 +44,9 @@ export async function POST(req: Request) {
 
     const response = await fetch(fetchUrl, { headers, next: { revalidate: 0 } });
     if (!response.ok) {
+      if (response.status === 500 && scraperApiKey) {
+         throw new Error(`ScraperAPI failed to retrieve the page. The link might be protected by CAPTCHA or invalid.`);
+      }
       throw new Error(`Failed to fetch from url (status: ${response.status})`);
     }
 
@@ -37,7 +60,7 @@ export async function POST(req: Request) {
     let extractedDetails: any = {};
     
     // We parse the original URL domain, not scraperapi's domain
-    const domain = new URL(url).hostname;
+    const domain = new URL(finalUrl).hostname;
 
     if (domain.includes('amazon') || domain.includes('amzn')) {
       title = $('#productTitle').text().trim() || $('meta[property="og:title"]').attr('content') || $('title').text();
@@ -48,6 +71,13 @@ export async function POST(req: Request) {
       }
       price = priceWhole;
       description = $('#productDescription').text().trim() || $('#feature-bullets').text().trim() || $('meta[property="og:description"]').attr('content') || '';
+      
+      // Extract specific Amazon details for the AI
+      const amznDetails = $('#productDetails_techSpec_section_1, #detailBullets_feature_div').text().replace(/\s+/g, ' ').trim();
+      extractedDetails.amazonRaw = {
+        features: $('#feature-bullets').text().replace(/\s+/g, ' ').trim(),
+        specs: amznDetails
+      };
       
       // Try finding high-res images in the DOM
       $('#altImages img, .a-dynamic-image').each((_, el) => {
