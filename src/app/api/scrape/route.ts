@@ -113,37 +113,16 @@ export async function POST(req: Request) {
                 }
               }
               
-              if (product.brand?.name) {
-                extractedDetails.brand = product.brand.name;
-              }
-              if (product.sizes && Array.isArray(product.sizes)) {
-                const sizeLabels = product.sizes.map((s: any) => s.label).filter(Boolean).join(', ');
-                if (sizeLabels) extractedDetails.availableSizes = sizeLabels;
-              }
-              if (product.articleAttributes) {
-                const attrs = product.articleAttributes;
-                
-                const fabric = attrs['Fabric'] || attrs['Top Fabric'] || attrs['Bottom Fabric'] || attrs['Material'];
-                if (fabric) extractedDetails.clothType = fabric;
-                
-                const color = attrs['Base Color'] || attrs['Colour'] || attrs['Color'];
-                if (color) extractedDetails.colors = color;
-                
-                if (attrs['Occasion']) extractedDetails.occasion = attrs['Occasion'];
-                
-                // Append remaining interesting attributes to the description for the user's reference
-                const excludedKeys = ['Fabric', 'Top Fabric', 'Bottom Fabric', 'Material', 'Base Color', 'Colour', 'Color', 'Occasion'];
-                const extraAttrs = Object.entries(attrs)
-                  .filter(([k]) => !excludedKeys.includes(k))
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join(', ');
-                if (extraAttrs) {
-                  description += `\n\nAdditional Details: ${extraAttrs}`;
-                }
-              }
               if (product.price?.discounted) {
                 price = product.price.discounted.toString();
               }
+              
+              // Feed raw JSON metadata to the AI context instead of parsing it manually
+              extractedDetails.myntraRaw = {
+                brand: product.brand,
+                sizes: product.sizes,
+                attributes: product.articleAttributes
+              };
             }
           } catch (e) {
             console.error('Failed to parse Myntra state');
@@ -175,10 +154,10 @@ export async function POST(req: Request) {
               images.push(...highResImages);
             }
             
-            // Append structured details to description
-            if (detailsData.validSizes && Array.isArray(detailsData.validSizes)) {
-               extractedDetails.availableSizes = detailsData.validSizes.join(', ');
-            }
+            extractedDetails.meeshoRaw = {
+              validSizes: detailsData.validSizes,
+              originalDescription: detailsData.description
+            };
             if (detailsData.price && detailsData.price > 0 && !price) {
                price = detailsData.price.toString();
             }
@@ -216,10 +195,10 @@ export async function POST(req: Request) {
     images = [...new Set(images)].slice(0, 5);
     
     // Extract a larger chunk of text from the body to give the AI more context (for sizes, colors, fabric)
-    const bodyText = $('body').text().replace(/\s+/g, ' ').substring(0, 6000);
+    const bodyText = $('body').text().replace(/\s+/g, ' ').substring(0, 4000);
 
     // --- GROQ AI EXTRACTION ---
-    let aiData = { brand: '', availableSizes: '', colors: '', clothType: '', occasion: '' };
+    let aiData = { brand: '', availableSizes: '', colors: '', clothType: '', occasion: '', appendedDescription: '' };
     
     if (groqApiKey) {
       try {
@@ -227,21 +206,23 @@ export async function POST(req: Request) {
         const groq = new Groq({ apiKey: groqApiKey });
         
         // We feed the AI the title, description, and body text to extract features
-        const prompt = `You are an expert fashion e-commerce data extraction assistant. Extract the product details from the following information. Look closely at the Raw Page Text for available sizes, colors, and fabric material.
+        const prompt = `You are an expert fashion e-commerce data extraction assistant. We have scraped raw data from a product page.
+I need you to extract the exact details to fit into our clean database schema.
 
+Raw Data Dump:
 Title: ${title}
 Description: ${description}
+Raw JSON/Metadata extracted: ${JSON.stringify(extractedDetails)}
+Raw Page Text (snippet): ${bodyText}
 
-Raw Page Text (snippet):
-${bodyText}
-
-Return ONLY a valid JSON object with the following keys. If a value is completely unknown, return an empty string. Do NOT include markdown formatting, backticks, or explanations.
+Please parse this raw data and return ONLY a valid JSON object with the following keys. Do not include markdown formatting or backticks.
 {
-  "brand": "Extract the brand name if visible, else empty",
-  "availableSizes": "Extract all available sizes (e.g. S, M, L, XL, 2XL) and return them as a comma-separated string",
-  "colors": "Extract the color(s) of the product and return as a comma-separated string",
-  "clothType": "Extract the fabric or material type (e.g. Cotton, Polyester, Georgette)",
-  "occasion": "Guess the best occasion from: Casual, Formal, Party, Ethnic"
+  "brand": "Extract the brand name. Return empty string if unknown.",
+  "availableSizes": "Extract all available sizes (e.g. S, M, L, XL, 6-12M, 28, 30) and return them as a comma-separated string. Look at the JSON metadata if available.",
+  "colors": "Extract the base color(s) of the product and return as a comma-separated string.",
+  "clothType": "Extract the fabric or material type (e.g. Cotton, Polyester, Georgette).",
+  "occasion": "Guess the best occasion from: Casual, Formal, Party, Ethnic",
+  "appendedDescription": "If the raw data contains interesting product features (like Neck type, Sleeve length, Pattern, Fit, Wash care) that are NOT already in the Description, write a clean, flowing 1-2 sentence paragraph summarizing them. Do NOT use raw JSON or key-value lists. If there's nothing useful to add, return an empty string."
 }`;
 
         const chatCompletion = await groq.chat.completions.create({
@@ -259,22 +240,21 @@ Return ONLY a valid JSON object with the following keys. If a value is completel
           availableSizes: parsed.availableSizes || '',
           colors: parsed.colors || '',
           clothType: parsed.clothType || '',
-          occasion: parsed.occasion?.toLowerCase() || ''
+          occasion: parsed.occasion?.toLowerCase() || '',
+          appendedDescription: parsed.appendedDescription || ''
         };
+        
+        // If AI generated a nice summary of extra features, append it cleanly to the main description
+        if (aiData.appendedDescription) {
+           description += `\n\nFeatures: ${aiData.appendedDescription}`;
+        }
+        
       } catch(err) {
         console.error("Groq AI Error:", err);
       }
     }
 
-    // Merge precise extracted details over AI's guesses
-    aiData = {
-      brand: extractedDetails.brand || aiData.brand,
-      availableSizes: extractedDetails.availableSizes || aiData.availableSizes,
-      colors: extractedDetails.colors || aiData.colors,
-      clothType: extractedDetails.clothType || aiData.clothType,
-      occasion: extractedDetails.occasion || aiData.occasion
-    };
-
+    // Use aiData exactly as returned
     return NextResponse.json({
       title,
       price,
