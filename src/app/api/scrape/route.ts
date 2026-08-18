@@ -70,7 +70,7 @@ export async function POST(req: Request) {
         priceWhole = $('.apexPriceToPay .a-offscreen').first().text().replace(/[^0-9]/g, '');
       }
       price = priceWhole;
-      description = $('#productDescription').text().trim() || $('#feature-bullets').text().trim() || $('meta[property="og:description"]').attr('content') || '';
+      description = $('#productDescription').text().trim() || $('#feature-bullets').text().trim() || $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
       
       // Extract specific Amazon details for the AI
       const amznDetails = $('#productDetails_techSpec_section_1, #detailBullets_feature_div').text().replace(/\s+/g, ' ').trim();
@@ -249,6 +249,7 @@ Raw Page Text (snippet): ${bodyText}
 Please parse this raw data and return ONLY a valid JSON object with the exact keys below. Do not include markdown formatting or backticks.
 {
   "brand": "Extract the brand name. Return empty string if unknown.",
+  "category": "Extract or guess the best category from: Co-ord Sets, Dresses, Jeans, Kurtis & Tunics, Nightwear, Tops, Traditional Wear, Western Wear, Wrap tops. Return empty string if unsure.",
   "availableSizes": "Extract all available sizes (e.g. S, M, L, XL, 6-12M, 28, 30) and return them as a comma-separated string. Look carefully at the JSON metadata for validSizes or sizes array.",
   "colors": "Extract the base color(s) of the product and return as a comma-separated string. Look closely at the JSON metadata for color fields.",
   "clothType": "Extract the fabric or material type (e.g. Cotton, Polyester, Georgette). Look closely at the JSON metadata for fabric fields.",
@@ -267,6 +268,7 @@ Please parse this raw data and return ONLY a valid JSON object with the exact ke
         
         aiData = {
           brand: parsed.brand || '',
+          category: parsed.category || '',
           availableSizes: parsed.availableSizes || '',
           colors: parsed.colors || '',
           clothType: parsed.clothType || '',

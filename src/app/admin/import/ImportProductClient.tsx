@@ -41,6 +41,7 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
         affiliateUrl: fetchUrl,
         storeName: derivedStore || '',
         brand: data.brand || '',
+        categorySlug: categories.find(c => c.name.toLowerCase() === (data.category || '').toLowerCase())?.slug || '',
         attributes: {
           colors: data.colors ? data.colors.split(',').map((s: string) => s.trim()) : [],
           availableSizes: data.availableSizes ? data.availableSizes.split(',').map((s: string) => s.trim()) : [],
