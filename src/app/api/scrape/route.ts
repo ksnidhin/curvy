@@ -198,7 +198,7 @@ export async function POST(req: Request) {
     const bodyText = $('body').text().replace(/\s+/g, ' ').substring(0, 4000);
 
     // --- GROQ AI EXTRACTION ---
-    let aiData = { brand: '', availableSizes: '', colors: '', clothType: '', occasion: '', appendedDescription: '' };
+    let aiData = { brand: '', availableSizes: '', colors: '', clothType: '', occasion: '' };
     
     if (groqApiKey) {
       try {
@@ -207,7 +207,8 @@ export async function POST(req: Request) {
         
         // We feed the AI the title, description, and body text to extract features
         const prompt = `You are an expert fashion e-commerce data extraction assistant. We have scraped raw data from a product page.
-I need you to extract the exact details to fit into our clean database schema.
+I need you to carefully extract the exact details to fit strictly into our clean database schema.
+DO NOT summarize or dump remaining data. ONLY extract what is asked for.
 
 Raw Data Dump:
 Title: ${title}
@@ -215,14 +216,13 @@ Description: ${description}
 Raw JSON/Metadata extracted: ${JSON.stringify(extractedDetails)}
 Raw Page Text (snippet): ${bodyText}
 
-Please parse this raw data and return ONLY a valid JSON object with the following keys. Do not include markdown formatting or backticks.
+Please parse this raw data and return ONLY a valid JSON object with the exact keys below. Do not include markdown formatting or backticks.
 {
   "brand": "Extract the brand name. Return empty string if unknown.",
-  "availableSizes": "Extract all available sizes (e.g. S, M, L, XL, 6-12M, 28, 30) and return them as a comma-separated string. Look at the JSON metadata if available.",
-  "colors": "Extract the base color(s) of the product and return as a comma-separated string.",
-  "clothType": "Extract the fabric or material type (e.g. Cotton, Polyester, Georgette).",
-  "occasion": "Guess the best occasion from: Casual, Formal, Party, Ethnic",
-  "appendedDescription": "If the raw data contains interesting product features (like Neck type, Sleeve length, Pattern, Fit, Wash care) that are NOT already in the Description, write a clean, flowing 1-2 sentence paragraph summarizing them. Do NOT use raw JSON or key-value lists. If there's nothing useful to add, return an empty string."
+  "availableSizes": "Extract all available sizes (e.g. S, M, L, XL, 6-12M, 28, 30) and return them as a comma-separated string. Look carefully at the JSON metadata for validSizes or sizes array.",
+  "colors": "Extract the base color(s) of the product and return as a comma-separated string. Look closely at the JSON metadata for color fields.",
+  "clothType": "Extract the fabric or material type (e.g. Cotton, Polyester, Georgette). Look closely at the JSON metadata for fabric fields.",
+  "occasion": "Guess the best occasion from: Casual, Formal, Party, Ethnic. Return Casual if unsure."
 }`;
 
         const chatCompletion = await groq.chat.completions.create({
@@ -240,15 +240,8 @@ Please parse this raw data and return ONLY a valid JSON object with the followin
           availableSizes: parsed.availableSizes || '',
           colors: parsed.colors || '',
           clothType: parsed.clothType || '',
-          occasion: parsed.occasion?.toLowerCase() || '',
-          appendedDescription: parsed.appendedDescription || ''
+          occasion: parsed.occasion?.toLowerCase() || ''
         };
-        
-        // If AI generated a nice summary of extra features, append it cleanly to the main description
-        if (aiData.appendedDescription) {
-           description += `\n\nFeatures: ${aiData.appendedDescription}`;
-        }
-        
       } catch(err) {
         console.error("Groq AI Error:", err);
       }
