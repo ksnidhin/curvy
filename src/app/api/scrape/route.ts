@@ -19,34 +19,47 @@ function parseCookieInput(rawCookie?: string | null): string {
   return trimmed;
 }
 
-function resolveCookiesForUrl(url: string, explicitCookies?: string): string {
+async function getStoredCookies(): Promise<Record<string, string>> {
+  try {
+    const fs = (await import('fs/promises')).default;
+    const path = (await import('path')).default;
+    const filePath = path.join(process.cwd(), 'data/cookies.json');
+    const content = await fs.readFile(filePath, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return {};
+  }
+}
+
+async function resolveCookiesForUrl(url: string, explicitCookies?: string): Promise<string> {
   if (explicitCookies && explicitCookies.trim()) {
     return parseCookieInput(explicitCookies);
   }
 
+  const stored = await getStoredCookies();
   const lower = url.toLowerCase();
-  let envCookie = '';
+  let cookie = '';
   if (lower.includes('amazon') || lower.includes('amzn')) {
-    envCookie = process.env.AMAZON_COOKIES || '';
+    cookie = stored.amazon || process.env.AMAZON_COOKIES || '';
   } else if (lower.includes('myntra')) {
-    envCookie = process.env.MYNTRA_COOKIES || '';
+    cookie = stored.myntra || process.env.MYNTRA_COOKIES || '';
   } else if (lower.includes('flipkart')) {
-    envCookie = process.env.FLIPKART_COOKIES || '';
+    cookie = stored.flipkart || process.env.FLIPKART_COOKIES || '';
   } else if (lower.includes('ajio')) {
-    envCookie = process.env.AJIO_COOKIES || '';
+    cookie = stored.ajio || process.env.AJIO_COOKIES || '';
   } else if (lower.includes('meesho')) {
-    envCookie = process.env.MEESHO_COOKIES || '';
+    cookie = stored.meesho || process.env.MEESHO_COOKIES || '';
   } else if (lower.includes('tatacliq')) {
-    envCookie = process.env.TATACLIQ_COOKIES || '';
+    cookie = stored.tatacliq || process.env.TATACLIQ_COOKIES || '';
   } else if (lower.includes('nykaa')) {
-    envCookie = process.env.NYKAA_COOKIES || '';
+    cookie = stored.nykaa || process.env.NYKAA_COOKIES || '';
   }
 
-  if (!envCookie) {
-    envCookie = process.env.CUSTOM_COOKIES || '';
+  if (!cookie) {
+    cookie = stored.custom || process.env.CUSTOM_COOKIES || '';
   }
 
-  return parseCookieInput(envCookie);
+  return parseCookieInput(cookie);
 }
 
 export async function POST(req: Request) {
@@ -57,7 +70,7 @@ export async function POST(req: Request) {
     const scraperApiKey = process.env.SCRAPERAPI_KEY;
     const groqApiKey = process.env.GROQ_API_KEY;
     
-    const userCookie = resolveCookiesForUrl(url, reqCookies);
+    const userCookie = await resolveCookiesForUrl(url, reqCookies);
     let finalUrl = url;
 
     // Resolve short URLs BEFORE sending to ScraperAPI or fetching

@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Curvy - Cookie & Link Extractor",
+  "version": "1.0.0",
+  "description": "Extracts cookies and product links from Amazon, Myntra, Flipkart, and Ajio for Curvy Admin.",
+  "permissions": [
+    "cookies",
+    "activeTab",
+    "clipboardWrite",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.amazon.in/*",
+    "*://*.amazon.com/*",
+    "*://*.myntra.com/*",
+    "*://*.flipkart.com/*",
+    "*://*.ajio.com/*",
+    "*://*.meesho.com/*",
+    "*://*.tatacliq.com/*",
+    "*://*.nykaa.com/*",
+    "*://*.nykaafashion.com/*",
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Curvy Cookie Extractor"
+  }
+}
