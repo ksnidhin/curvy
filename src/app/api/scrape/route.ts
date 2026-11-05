@@ -1,24 +1,74 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 
+function parseCookieInput(rawCookie?: string | null): string {
+  if (!rawCookie || !rawCookie.trim()) return '';
+  const trimmed = rawCookie.trim();
+  // Support JSON format exported from Cookie-Editor extension (array of cookie objects)
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      const arr = JSON.parse(trimmed);
+      if (Array.isArray(arr)) {
+        return arr
+          .filter((item: any) => item && item.name && item.value !== undefined)
+          .map((item: any) => `${item.name}=${item.value}`)
+          .join('; ');
+      }
+    } catch {}
+  }
+  return trimmed;
+}
+
+function resolveCookiesForUrl(url: string, explicitCookies?: string): string {
+  if (explicitCookies && explicitCookies.trim()) {
+    return parseCookieInput(explicitCookies);
+  }
+
+  const lower = url.toLowerCase();
+  let envCookie = '';
+  if (lower.includes('amazon') || lower.includes('amzn')) {
+    envCookie = process.env.AMAZON_COOKIES || '';
+  } else if (lower.includes('myntra')) {
+    envCookie = process.env.MYNTRA_COOKIES || '';
+  } else if (lower.includes('flipkart')) {
+    envCookie = process.env.FLIPKART_COOKIES || '';
+  } else if (lower.includes('ajio')) {
+    envCookie = process.env.AJIO_COOKIES || '';
+  } else if (lower.includes('meesho')) {
+    envCookie = process.env.MEESHO_COOKIES || '';
+  } else if (lower.includes('tatacliq')) {
+    envCookie = process.env.TATACLIQ_COOKIES || '';
+  } else if (lower.includes('nykaa')) {
+    envCookie = process.env.NYKAA_COOKIES || '';
+  }
+
+  if (!envCookie) {
+    envCookie = process.env.CUSTOM_COOKIES || '';
+  }
+
+  return parseCookieInput(envCookie);
+}
+
 export async function POST(req: Request) {
   try {
-    const { url } = await req.json();
+    const { url, cookies: reqCookies } = await req.json();
     if (!url) return NextResponse.json({ error: 'URL is required' }, { status: 400 });
 
     const scraperApiKey = process.env.SCRAPERAPI_KEY;
     const groqApiKey = process.env.GROQ_API_KEY;
     
+    const userCookie = resolveCookiesForUrl(url, reqCookies);
     let finalUrl = url;
 
-    // Resolve short URLs BEFORE sending to ScraperAPI
+    // Resolve short URLs BEFORE sending to ScraperAPI or fetching
     if (url.includes('amzn.in') || url.includes('amzn.to')) {
       try {
         const redirectRes = await fetch(url, {
           method: 'GET',
           redirect: 'follow',
           headers: {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+            ...(userCookie ? { 'Cookie': userCookie } : {})
           }
         });
         if (redirectRes.url) {
@@ -29,28 +79,73 @@ export async function POST(req: Request) {
       }
     }
 
-    let fetchUrl = finalUrl;
-    if (scraperApiKey) {
-      const isAmazon = finalUrl.includes('amazon') || finalUrl.includes('amzn');
-      const premiumFlag = isAmazon ? '&premium=true' : '';
-      fetchUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(finalUrl)}${premiumFlag}`;
-    }
-
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
+    const browserHeaders: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+      'Accept-Language': 'en-US,en;q=0.9,hi;q=0.8',
+      'Cache-Control': 'max-age=0',
+      'Sec-Ch-Ua': '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"Windows"',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Upgrade-Insecure-Requests': '1',
     };
 
-    const response = await fetch(fetchUrl, { headers, next: { revalidate: 0 } });
-    if (!response.ok) {
-      if (response.status === 500 && scraperApiKey) {
-         throw new Error(`ScraperAPI failed to retrieve the page. The link might be protected by CAPTCHA or invalid.`);
-      }
-      throw new Error(`Failed to fetch from url (status: ${response.status})`);
+    if (userCookie) {
+      browserHeaders['Cookie'] = userCookie;
     }
 
-    const html = await response.text();
+    let html = '';
+
+    // Step 1: If cookies are available, try direct residential/cookie fetch first
+    if (userCookie) {
+      try {
+        const directRes = await fetch(finalUrl, {
+          headers: browserHeaders,
+          redirect: 'follow',
+          next: { revalidate: 0 }
+        });
+
+        if (directRes.ok) {
+          const directHtml = await directRes.text();
+          const isBlocked = directHtml.includes('api-services-support@amazon.com') ||
+                            directHtml.includes('Type the characters you see in this image') ||
+                            directHtml.includes('Robot Check');
+
+          if (!isBlocked && directHtml.length > 1000) {
+            html = directHtml;
+          }
+        }
+      } catch (err) {
+        console.warn('Direct fetch with cookies encountered error, falling back:', err);
+      }
+    }
+
+    // Step 2: Fallback to ScraperAPI (with forward headers) or direct fetch if no HTML obtained yet
+    if (!html) {
+      let fetchUrl = finalUrl;
+      const headersToSend = { ...browserHeaders };
+
+      if (scraperApiKey) {
+        const isAmazon = finalUrl.includes('amazon') || finalUrl.includes('amzn');
+        const premiumFlag = isAmazon ? '&premium=true' : '';
+        const keepHeadersFlag = userCookie ? '&keep_headers=true' : '';
+        fetchUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(finalUrl)}${premiumFlag}${keepHeadersFlag}`;
+      }
+
+      const response = await fetch(fetchUrl, { headers: headersToSend, next: { revalidate: 0 } });
+      if (!response.ok) {
+        if (response.status === 500 && scraperApiKey) {
+          throw new Error('ScraperAPI failed to retrieve the page. The link might be protected by CAPTCHA or invalid.');
+        }
+        throw new Error(`Failed to fetch from url (status: ${response.status})`);
+      }
+      html = await response.text();
+    }
+
     const $ = cheerio.load(html);
 
     let title = '';
@@ -81,8 +176,8 @@ export async function POST(req: Request) {
       
       // Try finding high-res images in the DOM
       $('#altImages img, .a-dynamic-image').each((_, el) => {
-        let src = $(el).attr('src') || $(el).data('old-hires') || $(el).attr('data-src');
-        if (src && src.startsWith('http')) {
+        let src = ($(el).attr('src') || $(el).data('old-hires') || $(el).attr('data-src')) as string | undefined;
+        if (typeof src === 'string' && src.startsWith('http')) {
           src = src.replace(/\._.*?\_\./, '.');
           images.push(src);
         }
@@ -103,21 +198,19 @@ export async function POST(req: Request) {
       images = [...new Set(images)].filter(img => !img.includes('icon') && !img.includes('transparent'));
       
       if (!price && (title.includes('Amazon.in') || title.includes('Robot Check') || title === '')) {
-        if (!scraperApiKey) {
-          throw new Error('Amazon anti-bot protection prevented scraping. Please configure ScraperAPI.');
-        } else {
-          throw new Error('Failed to extract product data. The link might be invalid, expired, or a CAPTCHA page.');
-        }
+        throw new Error('Amazon bot protection triggered. Please paste your personal browser session cookies in the Custom Cookies field or set AMAZON_COOKIES in .env.');
       }
     } else if (domain.includes('flipkart')) {
-      title = $('.B_NuCI').text().trim() || $('.VU-ZEz').text().trim();
+      title = $('.B_NuCI').text().trim() || $('.VU-ZEz').text().trim() || $('meta[property="og:title"]').attr('content') || '';
       price = $('._30jeq3').first().text().replace(/[^0-9]/g, '') || $('.Nx9bqj').first().text().replace(/[^0-9]/g, '');
-      description = $('._1mXcCf').text().trim();
+      description = $('._1mXcCf').text().trim() || $('meta[property="og:description"]').attr('content') || '';
       
-      $('img._396cs4, img._2r_T1I').each((_, el) => {
+      $('img._396cs4, img._2r_T1I, img.DByuf4').each((_, el) => {
         const src = $(el).attr('src');
         if (src) images.push(src.replace('128/128', '832/832').replace('128/128', '832/832'));
       });
+      const ogImage = $('meta[property="og:image"]').attr('content');
+      if (ogImage) images.push(ogImage);
     } else if (domain.includes('myntra')) {
       title = $('meta[property="og:title"]').attr('content') || $('title').text();
       description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
@@ -147,7 +240,6 @@ export async function POST(req: Request) {
                 price = product.price.discounted.toString();
               }
               
-              // Feed raw JSON metadata to the AI context instead of parsing it manually
               extractedDetails.myntraRaw = {
                 brand: product.brand,
                 sizes: product.sizes,
@@ -196,6 +288,17 @@ export async function POST(req: Request) {
           console.error('Failed to parse Meesho next data');
         }
       }
+    } else if (domain.includes('ajio')) {
+      title = $('.prod-name').text().trim() || $('meta[property="og:title"]').attr('content') || $('title').text();
+      description = $('.prod-desc').text().trim() || $('meta[property="og:description"]').attr('content') || '';
+      price = $('.prod-sp').text().replace(/[^0-9]/g, '');
+      
+      $('img.preview-img, img.prod-img').each((_, el) => {
+        const src = $(el).attr('src');
+        if (src && src.startsWith('http')) images.push(src);
+      });
+      const ogImage = $('meta[property="og:image"]').attr('content');
+      if (ogImage) images.push(ogImage);
     } else {
       // Generic fallback
       title = $('meta[property="og:title"]').attr('content') || $('title').text();
@@ -228,14 +331,13 @@ export async function POST(req: Request) {
     const bodyText = $('body').text().replace(/\s+/g, ' ').substring(0, 4000);
 
     // --- GROQ AI EXTRACTION ---
-    let aiData = { brand: '', availableSizes: '', colors: '', clothType: '', occasion: '' };
+    let aiData = { brand: '', category: '', availableSizes: '', colors: '', clothType: '', occasion: '' };
     
     if (groqApiKey) {
       try {
         const Groq = (await import('groq-sdk')).default;
         const groq = new Groq({ apiKey: groqApiKey });
         
-        // We feed the AI the title, description, and body text to extract features
         const prompt = `You are an expert fashion e-commerce data extraction assistant. We have scraped raw data from a product page.
 I need you to carefully extract the exact details to fit strictly into our clean database schema.
 DO NOT summarize or dump remaining data. ONLY extract what is asked for.
@@ -256,14 +358,24 @@ Please parse this raw data and return ONLY a valid JSON object with the exact ke
   "occasion": "Guess the best occasion from: Casual, Formal, Party, Ethnic. Return Casual if unsure."
 }`;
 
-        const chatCompletion = await groq.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
-          model: 'llama3-70b-8192',
-          temperature: 0.1,
-          response_format: { type: 'json_object' }
-        });
+        let aiResponse = '{}';
+        const modelsToTry = ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'llama3-70b-8192', 'llama-3.1-8b-instant'];
         
-        const aiResponse = chatCompletion.choices[0]?.message?.content || '{}';
+        for (const model of modelsToTry) {
+          try {
+            const chatCompletion = await groq.chat.completions.create({
+              messages: [{ role: 'user', content: prompt }],
+              model,
+              temperature: 0.1,
+              response_format: { type: 'json_object' }
+            });
+            aiResponse = chatCompletion.choices[0]?.message?.content || '{}';
+            if (aiResponse && aiResponse !== '{}') break;
+          } catch (modelErr: any) {
+            console.warn(`Groq model ${model} failed, trying next:`, modelErr.message);
+          }
+        }
+        
         const parsed = JSON.parse(aiResponse);
         
         aiData = {
@@ -279,7 +391,6 @@ Please parse this raw data and return ONLY a valid JSON object with the exact ke
       }
     }
 
-    // Use aiData exactly as returned
     return NextResponse.json({
       title,
       price,
