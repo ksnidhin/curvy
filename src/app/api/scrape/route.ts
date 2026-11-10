@@ -179,7 +179,7 @@ Respond strictly with a valid JSON object matching this schema:
   for (const model of models) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 12000);
+      const timeout = setTimeout(() => controller.abort(), 25000);
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       
       const res = await fetch(url, {
@@ -669,22 +669,36 @@ Return ONLY a JSON object:
       }
     }
 
-    // Step C: Fallback to raw extracted details if still empty
+    // Step C: Fallback to raw extracted details and regex heuristic extraction if still empty
+    const fullTextSearch = `${title} ${description} ${JSON.stringify(extractedDetails)}`;
+
     if (!aiData.brand) {
       aiData.brand = extractedDetails.amazon?.brand ||
                      extractedDetails.flipkart?.brand ||
                      extractedDetails.myntra?.brand ||
                      extractedDetails.ajio?.brand || '';
+      if (!aiData.brand) {
+        const brandMatch = title.match(/^([A-Za-z0-9&]+)(?:\s+Men|\s+Women|\s+'s|\s+Solid|\s+Regular|\s+Slim|\s+Cotton|\s+Denim)/i);
+        if (brandMatch && brandMatch[1]) aiData.brand = brandMatch[1].trim();
+      }
     }
 
     if (!aiData.clothType) {
       aiData.clothType = extractedDetails.amazon?.material || '';
+      if (!aiData.clothType) {
+        const fabricMatch = fullTextSearch.match(/\b(Denim|Cotton Blend|Cotton|Linen|Silk|Georgette|Chiffon|Rayon|Polyester|Satin|Velvet|Crepe|Lycra|Spandex|Elastane|Khadi)\b/i);
+        if (fabricMatch && fabricMatch[1]) aiData.clothType = fabricMatch[1].charAt(0).toUpperCase() + fabricMatch[1].slice(1).toLowerCase();
+      }
     }
 
     if (!aiData.colors) {
       aiData.colors = extractedDetails.amazon?.color ||
                       extractedDetails.flipkart?.color ||
                       extractedDetails.myntra?.color || '';
+      if (!aiData.colors) {
+        const colorMatch = fullTextSearch.match(/\b(Navy Blue|Light Blue|Dark Blue|Blue|Black|White|Grey|Gray|Red|Pink|Yellow|Green|Olive|Brown|Beige|Maroon|Purple|Orange)\b/i);
+        if (colorMatch && colorMatch[1]) aiData.colors = colorMatch[1].charAt(0).toUpperCase() + colorMatch[1].slice(1).toLowerCase();
+      }
     }
 
     if (!aiData.availableSizes) {
@@ -693,16 +707,43 @@ Return ONLY a JSON object:
                               extractedDetails.myntra?.sizes ||
                               extractedDetails.meesho?.validSizes ||
                               extractedDetails.ajio?.sizes || '';
+      if (!aiData.availableSizes) {
+        const sizeMatch = fullTextSearch.match(/[\(,]\s*(?:Size:\s*)?([2-4][0-9]|XXS|XS|S|M|L|XL|[2-8]XL)\s*[\),]/i) ||
+                          fullTextSearch.match(/\b(?:size|waist|)\s*([2-4][0-9]|XXS|XS|S|M|L|XL|[2-8]XL)\b/i);
+        if (sizeMatch && sizeMatch[1]) aiData.availableSizes = sizeMatch[1].toUpperCase();
+      }
     }
 
     if (!aiData.category) {
-      const lowerAll = (title + ' ' + (extractedDetails.amazon?.breadcrumbs || '')).toLowerCase();
+      const lowerAll = fullTextSearch.toLowerCase();
       if (lowerAll.includes('jean') || lowerAll.includes('denim')) aiData.category = 'Jeans';
       else if (lowerAll.includes('dress')) aiData.category = 'Dresses';
-      else if (lowerAll.includes('kurti') || lowerAll.includes('kurta')) aiData.category = 'Kurtis & Tunics';
-      else if (lowerAll.includes('night') || lowerAll.includes('pyjama') || lowerAll.includes('sleep')) aiData.category = 'Nightwear';
+      else if (lowerAll.includes('kurti') || lowerAll.includes('kurta') || lowerAll.includes('anarkali')) aiData.category = 'Kurtis & Tunics';
+      else if (lowerAll.includes('night') || lowerAll.includes('pyjama') || lowerAll.includes('sleepwear')) aiData.category = 'Nightwear';
       else if (lowerAll.includes('co-ord') || lowerAll.includes('coord') || lowerAll.includes('set')) aiData.category = 'Co-ord Sets';
-      else if (lowerAll.includes('top') || lowerAll.includes('tee') || lowerAll.includes('shirt')) aiData.category = 'Tops';
+      else if (lowerAll.includes('top') || lowerAll.includes('tee') || lowerAll.includes('shirt') || lowerAll.includes('blouse')) aiData.category = 'Tops';
+      else if (lowerAll.includes('saree') || lowerAll.includes('lehenga') || lowerAll.includes('ethnic')) aiData.category = 'Traditional Wear';
+      else aiData.category = 'Western Wear';
+    }
+
+    // Clean up description if it was raw retailer title or empty
+    if (!aiData.description || aiData.description.includes('Amazon.in:') || aiData.description.includes('Robot Check')) {
+      const cleanBrand = aiData.brand || 'This';
+      const cleanCloth = aiData.clothType ? `${aiData.clothType} ` : '';
+      const cleanCat = aiData.category || 'piece';
+      aiData.description = `Elevate your wardrobe with this stylish ${cleanBrand} ${cleanCloth}${cleanCat.toLowerCase()}. Designed for all-day comfort and effortless styling, it offers the perfect balance of fit and fashion.`;
+    }
+
+    // Clean up title if it contains noise or typos
+    if (!aiData.title || aiData.title === title) {
+      let t = (aiData.title || title)
+        .replace(/\bLool\b/g, 'Look')
+        .replace(/\|+/g, ' - ')
+        .replace(/\s*:\s*Amazon\.in\s*:\s*Fashion/gi, '')
+        .replace(/\([^\)]+\)/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      aiData.title = t;
     }
 
     return NextResponse.json({
