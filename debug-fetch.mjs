@@ -1,22 +1,15 @@
 import { gotScraping } from 'got-scraping';
 
-async function testFetch(name, url) {
-  console.log(`\n================ Testing ${name}: ${url} ================`);
+async function testApi(name, url, headers = {}) {
+  console.log(`\n================ Testing API ${name}: ${url} ================`);
   try {
     const res = await gotScraping({
       url,
       method: 'GET',
       headers: {
-        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'accept-language': 'en-IN,en-US;q=0.9,en;q=0.8',
-        'sec-ch-ua': '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-        'sec-fetch-dest': 'document',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-site': 'none',
-        'sec-fetch-user': '?1',
-        'upgrade-insecure-requests': '1'
+        'accept': 'application/json, text/plain, */*',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        ...headers
       },
       headerGeneratorOptions: {
         browsers: [{ name: 'chrome' }],
@@ -38,9 +31,16 @@ async function testFetch(name, url) {
 }
 
 async function run() {
-  await testFetch('Myntra Direct', 'https://www.myntra.com/26500000');
-  await testFetch('Meesho Direct', 'https://www.meesho.com/s/p/6h6xba');
-  await testFetch('Ajio Direct', 'https://www.ajio.com/kotty-men-washed-slim-fit-jeans/p/466579899_blue');
+  await testApi('Myntra Gateway API', 'https://www.myntra.com/gateway/v2/product/26500000', {
+    'x-meta-app': 'channel=web',
+    'referer': 'https://www.myntra.com/'
+  });
+  await testApi('Ajio API', 'https://www.ajio.com/api/p/466579899_blue', {
+    'referer': 'https://www.ajio.com/'
+  });
+  await testApi('Meesho API', 'https://www.meesho.com/api/v1/products/6h6xba', {
+    'referer': 'https://www.meesho.com/'
+  });
 }
 
 run();
