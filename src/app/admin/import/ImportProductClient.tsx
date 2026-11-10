@@ -8,6 +8,8 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
   const [fetchUrl, setFetchUrl] = useState('');
   const [customCookies, setCustomCookies] = useState('');
   const [showCookies, setShowCookies] = useState(false);
+  const [rawHtmlInput, setRawHtmlInput] = useState('');
+  const [showHtmlPaste, setShowHtmlPaste] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [fetchError, setFetchError] = useState('');
   const [initialData, setInitialData] = useState<any>(null);
@@ -30,9 +32,7 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
     try {
       const saved = localStorage.getItem('curvy_supplier_cookies');
       if (saved) setCustomCookies(saved);
-    } catch (e) {
-      // LocalStorage access might fail in private browsing
-    }
+    } catch (e) {}
   }, []);
 
   const handleCookieChange = (val: string) => {
@@ -49,8 +49,8 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
     } catch (e) {}
   };
 
-  const handleFetch = async () => {
-    if (!fetchUrl) return;
+  const handleFetch = async (overrideHtml?: string) => {
+    if (!fetchUrl && !overrideHtml) return;
     setIsFetching(true);
     setFetchError('');
     try {
@@ -59,11 +59,22 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           url: fetchUrl,
-          cookies: customCookies.trim() || undefined
+          cookies: customCookies.trim() || undefined,
+          rawHtml: overrideHtml || (rawHtmlInput.trim() ? rawHtmlInput.trim() : undefined)
         })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch');
+      
+      const data = await res.json().catch(() => ({}));
+      
+      if (!data.title && (data.error || !data.success)) {
+        if (data.needsClientFetch) {
+          setShowHtmlPaste(true);
+          setFetchError(`${data.error} (Tip: Paste the product page HTML below or sync cookies to import instantly).`);
+        } else {
+          setFetchError(data.error || 'Failed to extract product details');
+        }
+        return;
+      }
       
       let derivedStore = '';
       try {
@@ -117,13 +128,13 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
           clothType: data.clothType || '',
           occasion
         },
-        images: (data.images || []).map((url: string) => ({ url })) // MinimalProductForm handles strings/objects
+        images: (data.images || []).map((url: string) => ({ url }))
       };
       
       setInitialData(scrapedProduct);
       setFormKey(prev => prev + 1);
     } catch (err: any) {
-      setFetchError(err.message);
+      setFetchError(err.message || 'Error communicating with server');
     } finally {
       setIsFetching(false);
     }
@@ -148,7 +159,7 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
               />
               <button
                 type="button"
-                onClick={handleFetch}
+                onClick={() => handleFetch()}
                 disabled={isFetching || !fetchUrl}
                 className="px-4 py-2 bg-sage text-white rounded-md hover:bg-sage/90 disabled:opacity-50 transition-colors whitespace-nowrap"
               >
@@ -158,7 +169,7 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
           </div>
 
           {/* Session Cookies Section */}
-          <div className="pt-2 border-t border-sage/20">
+          <div className="pt-2 border-t border-sage/20 flex flex-wrap items-center gap-4">
             <button
               type="button"
               onClick={() => setShowCookies(!showCookies)}
@@ -176,33 +187,62 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
               ) : null}
             </button>
 
-            {showCookies && (
-              <div className="mt-3 p-3 bg-white rounded-md border border-gray-200 text-xs space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-700">Paste Browser Cookie Header or Cookie-Editor JSON:</span>
-                  {customCookies.trim() && (
-                    <button
-                      type="button"
-                      onClick={handleClearCookies}
-                      className="text-red-500 hover:text-red-700 text-xs"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <textarea
-                  rows={3}
-                  placeholder="Paste cookies here (e.g. session-id=259-...; ubid-acbin=... or [{ name: '...', value: '...' }])"
-                  value={customCookies}
-                  onChange={(e) => handleCookieChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs focus:ring-sage focus:border-sage"
-                />
-                <p className="text-gray-500 text-[11px] leading-relaxed">
-                  ðŸ’¡ <strong>How to get cookies from your PC:</strong> On Amazon or Myntra in Chrome, press <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">F12</kbd> â†’ <strong>Network</strong> tab â†’ click any request to the site â†’ right-click <strong>Cookie</strong> in Request Headers â†’ <strong>Copy value</strong>. Cookies are automatically saved in your browser for future imports.
-                </p>
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => setShowHtmlPaste(!showHtmlPaste)}
+              className="text-xs font-medium text-gray-500 hover:text-gray-800 hover:underline"
+            >
+              {showHtmlPaste ? '▼ Hide HTML Paste' : '▶ Fallback: Direct HTML Paste'}
+            </button>
           </div>
+
+          {showCookies && (
+            <div className="mt-3 p-3 bg-white rounded-md border border-gray-200 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-gray-700">Paste Browser Cookie Header or Cookie-Editor JSON:</span>
+                {customCookies.trim() && (
+                  <button
+                    type="button"
+                    onClick={handleClearCookies}
+                    className="text-red-500 hover:text-red-700 text-xs"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <textarea
+                rows={3}
+                placeholder="Paste cookies here (e.g. session-id=259-...; ubid-acbin=... or [{ name: '...', value: '...' }])"
+                value={customCookies}
+                onChange={(e) => handleCookieChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs focus:ring-sage focus:border-sage"
+              />
+              <p className="text-gray-500 text-[11px] leading-relaxed">
+                💡 <strong>How to get cookies:</strong> Use the <em>Curvy Extractor</em> Chrome extension to 1-Click sync all store cookies, or copy cookies from Chrome DevTools (F12 → Application → Cookies).
+              </p>
+            </div>
+          )}
+
+          {showHtmlPaste && (
+            <div className="mt-3 p-3 bg-white rounded-md border border-gray-200 text-xs space-y-2">
+              <span className="font-medium text-gray-700">Paste Full Page HTML (Bypasses any IP/Cloudflare restriction):</span>
+              <textarea
+                rows={4}
+                placeholder="Paste product page source HTML (Ctrl+U → Ctrl+A → Ctrl+C) here..."
+                value={rawHtmlInput}
+                onChange={(e) => setRawHtmlInput(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs focus:ring-sage focus:border-sage"
+              />
+              <button
+                type="button"
+                onClick={() => handleFetch(rawHtmlInput)}
+                disabled={isFetching || !rawHtmlInput.trim()}
+                className="px-3 py-1.5 bg-gray-800 text-white rounded text-xs hover:bg-black transition-colors"
+              >
+                Extract from Pasted HTML
+              </button>
+            </div>
+          )}
 
           {fetchError && <p className="text-red-500 text-xs mt-2">{fetchError}</p>}
         </div>

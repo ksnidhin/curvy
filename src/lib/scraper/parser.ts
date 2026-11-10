@@ -105,7 +105,7 @@ export function parseProductData(
   // 2. Embedded State JSON Extraction (Platform Specific)
   // --------------------------------------------------------------------------
   if (platform === 'myntra') {
-    const myxMatch = content.match(/window\.__myx\s*=\s*(\{.*?\});/s) || content.match(/<script>window\.__myx\s*=\s*(.*?)<\/script>/s);
+    const myxMatch = content.match(/window\.__myx\s*=\s*(\{.*?\})(?:;|\s*<\/script>)/s) || content.match(/<script>window\.__myx\s*=\s*(.*?)<\/script>/s);
     if (myxMatch && myxMatch[1]) {
       try {
         const myxData = JSON.parse(myxMatch[1]);
@@ -129,7 +129,7 @@ export function parseProductData(
       } catch {}
     }
   } else if (platform === 'ajio') {
-    const preloadedMatch = content.match(/window\.__PRELOADED_STATE__\s*=\s*(\{.*?\});/s);
+    const preloadedMatch = content.match(/window\.__PRELOADED_STATE__\s*=\s*(\{.*?\})(?:;|\s*<\/script>)/s);
     if (preloadedMatch && preloadedMatch[1]) {
       try {
         const ajioState = JSON.parse(preloadedMatch[1]);
@@ -172,7 +172,7 @@ export function parseProductData(
       } catch {}
     }
   } else if (platform === 'flipkart') {
-    const initialStateMatch = content.match(/window\.__INITIAL_STATE__\s*=\s*(\{.*?\});/s);
+    const initialStateMatch = content.match(/window\.__INITIAL_STATE__\s*=\s*(\{.*?\})(?:;|\s*<\/script>)/s);
     if (initialStateMatch && initialStateMatch[1]) {
       try {
         const fkState = JSON.parse(initialStateMatch[1]);

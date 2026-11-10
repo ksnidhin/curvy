@@ -15,50 +15,26 @@ interface StructuredProductExtraction {
   description?: string;
 }
 
-async function extractWithGemini(
-  apiKey: string,
-  raw: {
-    title: string;
-    description: string;
-    extractedDetails: Record<string, any>;
-    bodyText: string;
-  }
-): Promise<StructuredProductExtraction | null> {
-  const models = [
-    'gemini-3.8-flash',
-    'gemini-3.7-flash',
-    'gemini-3.5-flash',
-    'gemini-2.5-flash',
-    'gemini-flash-latest'
-  ];
+const AI_CATALOG_PROMPT = `You are an expert fashion catalog editor for the brand "Curvy Girls".
+Analyze the scraped product data and accurately structure the fashion catalog fields.
 
-  const prompt = `You are an expert e-commerce catalog assistant for the fashion brand "Curvygirls".
-We have scraped product data from a retailer page. Analyze the raw data and accurately categorize, clean, and map all fields to fit our clean database schema.
-
-RAW PRODUCT DATA:
-- Scraped Title: ${raw.title}
-- Scraped Description/Bullets: ${raw.description}
-- Extracted Details: ${JSON.stringify(raw.extractedDetails)}
-- Page Snippet: ${raw.bodyText.substring(0, 3000)}
-
-ALLOWED CATEGORIES (Pick EXACTLY ONE from this list):
+ALLOWED CATEGORIES (Pick EXACTLY ONE):
 ["Co-ord Sets", "Dresses", "Jeans", "Kurtis & Tunics", "Nightwear", "Tops", "Traditional Wear", "Western Wear", "Wrap tops"]
-(Guidelines: Any jeans, denim trousers, or jeggings MUST be categorized as "Jeans". Any kurtas, kurtis, anarkalis MUST be "Kurtis & Tunics". Nightgowns, pyjama sets, sleepwear MUST be "Nightwear". Two-piece matching sets MUST be "Co-ord Sets". Western shirts/t-shirts/blouses MUST be "Tops" or "Western Wear". Sarees, lehengas, dupattas MUST be "Traditional Wear".)
 
-ALLOWED OCCASIONS (Pick EXACTLY ONE from this list):
+ALLOWED OCCASIONS (Pick EXACTLY ONE, lowercase):
 ["casual", "formal", "party", "ethnic"]
 
-EXTRACTION & CLEANING RULES:
-1. "title": A clean, appealing product title without seller SEO spam, pipe characters ("|"), or typos (e.g. fix "Lool" -> "Look", remove "Amazon.in: Fashion", remove "(Blue, 32)"). Max 70 characters.
-2. "brand": Brand name (e.g. "KOTTY"). Extract from title or details.
-3. "category": Pick ONE EXACT category from the ALLOWED CATEGORIES list above.
-4. "availableSizes": Comma-separated list of sizes (e.g. "28, 30, 32, 34, 36" for jeans/pants, or "S, M, L, XL" for tops/dresses). Strip units like "inches", "waist", "size". If variations or sizes were found in the details or title, include all available sizes.
-5. "colors": Comma-separated primary clean color names (e.g. "Blue" or "Dark Blue").
-6. "clothType": Fabric or material composition (e.g. "Denim", "Cotton", "Cotton Blend", "Georgette", "Polyester", "Rayon").
-7. "occasion": ONE from the ALLOWED OCCASIONS list (lowercase: "casual", "formal", "party", or "ethnic").
-8. "description": An attractive, clean, boutique-style product description (2 to 4 sentences) written in an engaging tone. Highlight the fit, style, and fabric comfort. DO NOT include raw dumped specs, bullet points, retailer names, or seller noise.
+RULES:
+1. "title": A clean product title without seller spam, pipes ("|"), or typos (e.g. fix "Lool" -> "Look", remove "Amazon.in: Fashion", remove size/color in parentheses). Max 65 characters.
+2. "brand": Brand name (e.g. "KOTTY", "FREX", "Zara").
+3. "category": Pick ONE EXACT string from ALLOWED CATEGORIES.
+4. "availableSizes": Comma-separated sizes (e.g. "28, 30, 32, 34, 36" for pants/jeans, or "S, M, L, XL" for tops/dresses).
+5. "colors": Comma-separated primary colors (e.g. "Blue", "Black", "Maroon").
+6. "clothType": Fabric or material (e.g. "Denim", "Cotton", "Silk", "Georgette", "Polyester", "Rayon").
+7. "occasion": ONE from ALLOWED OCCASIONS ("casual", "formal", "party", "ethnic").
+8. "description": An appealing, boutique-style 2-3 sentence description highlighting fit, style, and comfort.
 
-Respond strictly with a valid JSON object matching this schema:
+Respond STRICTLY with a valid JSON object matching this schema:
 {
   "title": "Clean Product Title",
   "brand": "Brand Name",
@@ -67,25 +43,39 @@ Respond strictly with a valid JSON object matching this schema:
   "colors": "Blue",
   "clothType": "Denim",
   "occasion": "casual",
-  "description": "Clean attractive product description."
+  "description": "Attractive boutique description."
 }`;
 
-  for (const model of models) {
+async function extractWithAi(
+  title: string,
+  description: string,
+  rawDetails: Record<string, any>,
+  bodyText: string
+): Promise<StructuredProductExtraction | null> {
+  const geminiKey = process.env.GEMINI_API_KEY || '';
+  const groqKey = process.env.GROQ_API_KEY || '';
+
+  const inputSnippet = `
+Scraped Title: ${title}
+Scraped Description: ${description}
+Extracted Details: ${JSON.stringify(rawDetails)}
+Page Snippet: ${bodyText.substring(0, 2500)}
+`.trim();
+
+  // 1. Try Gemini 3.8 Flash (with strict 3.5s timeout)
+  if (geminiKey) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 25000);
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      
+      const timeout = setTimeout(() => controller.abort(), 3500);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`;
+
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.1
-          }
+          contents: [{ parts: [{ text: `${AI_CATALOG_PROMPT}\n\n${inputSnippet}` }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
         })
       });
       clearTimeout(timeout);
@@ -94,17 +84,31 @@ Respond strictly with a valid JSON object matching this schema:
         const data = await res.json();
         const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (rawText) {
-          const parsed = JSON.parse(rawText.trim());
-          console.log(`[Scraper] Successfully extracted fields with Gemini model: ${model}`);
-          return parsed;
+          return JSON.parse(rawText.trim());
         }
-      } else {
-        const errText = await res.text().catch(() => '');
-        console.warn(`[Scraper] Gemini model ${model} failed (${res.status}): ${errText.substring(0, 100)}`);
       }
-    } catch (err: any) {
-      console.warn(`[Scraper] Gemini model ${model} exception: ${err.message}`);
-    }
+    } catch {}
+  }
+
+  // 2. Fast Fallback: Groq (Llama 3.3 70B, ~300ms response time)
+  if (groqKey) {
+    try {
+      const Groq = (await import('groq-sdk')).default;
+      const groq = new Groq({ apiKey: groqKey });
+      const comp = await groq.chat.completions.create({
+        messages: [
+          { role: 'system', content: AI_CATALOG_PROMPT },
+          { role: 'user', content: inputSnippet }
+        ],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.1,
+        response_format: { type: 'json_object' }
+      });
+      const content = comp.choices[0]?.message?.content;
+      if (content) {
+        return JSON.parse(content.trim());
+      }
+    } catch {}
   }
 
   return null;
@@ -112,162 +116,155 @@ Respond strictly with a valid JSON object matching this schema:
 
 export async function POST(req: Request) {
   try {
-    const { url, cookies: reqCookies } = await req.json();
-    if (!url) return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    const { url, cookies: reqCookies, rawHtml } = body;
 
-    const rawUrl = url.trim();
+    if (!url && !rawHtml) {
+      return NextResponse.json({ success: false, error: 'URL or HTML is required' }, { status: 400 });
+    }
+
+    const rawUrl = (url || '').trim();
 
     // ------------------------------------------------------------------------
     // STAGE 1: Universal Affiliate & Short-Link Unshortener
     // ------------------------------------------------------------------------
-    const resolvedUrl = await unshortenUrl(rawUrl);
+    const resolvedUrl = rawUrl ? await unshortenUrl(rawUrl) : '';
 
     // ------------------------------------------------------------------------
     // STAGE 2: Strict URL Canonicalization
     // ------------------------------------------------------------------------
-    const { canonicalUrl, platform, productId } = canonicalizeUrl(resolvedUrl);
+    const { canonicalUrl, platform, productId } = canonicalizeUrl(resolvedUrl || rawUrl);
 
     // ------------------------------------------------------------------------
-    // STAGE 3: 3-Tier Zero-Failure Fetching Engine
-    // STRICT RULE: Never pass static cookies to Flipkart, Myntra, Meesho, Ajio!
+    // STAGE 3: 3-Tier Zero-Failure Fetching Engine (or direct HTML from client)
     // ------------------------------------------------------------------------
-    let optionalAmazonCookie: string | undefined;
-    if (platform === 'amazon') {
-      if (reqCookies && typeof reqCookies === 'string' && reqCookies.trim()) {
-        optionalAmazonCookie = reqCookies.trim();
-      } else {
-        try {
-          const fs = (await import('fs/promises')).default;
-          const path = (await import('path')).default;
-          const filePath = path.join(process.cwd(), 'data/cookies.json');
-          const content = await fs.readFile(filePath, 'utf-8');
-          const stored = JSON.parse(content);
-          if (stored.amazon) optionalAmazonCookie = stored.amazon;
-        } catch {}
+    let htmlContent = '';
+    let tierUsed: string = 'TIER_1_DIRECT_TLS';
+    let isJsonPayload = false;
+
+    if (rawHtml && typeof rawHtml === 'string' && rawHtml.length > 100) {
+      htmlContent = rawHtml;
+      tierUsed = 'CLIENT_ASSISTED_HTML';
+    } else {
+      let optionalAmazonCookie: string | undefined;
+      if (platform === 'amazon') {
+        if (reqCookies && typeof reqCookies === 'string' && reqCookies.trim()) {
+          optionalAmazonCookie = reqCookies.trim();
+        } else {
+          try {
+            const fs = (await import('fs/promises')).default;
+            const path = (await import('path')).default;
+            const filePath = path.join(process.cwd(), 'data/cookies.json');
+            const content = await fs.readFile(filePath, 'utf-8');
+            const stored = JSON.parse(content);
+            if (stored.amazon) optionalAmazonCookie = stored.amazon;
+          } catch {}
+        }
+      }
+
+      try {
+        const fetchResult = await fetchWithFallback(
+          canonicalUrl,
+          platform,
+          productId,
+          optionalAmazonCookie
+        );
+        htmlContent = fetchResult.html;
+        tierUsed = fetchResult.tierUsed;
+        isJsonPayload = !!fetchResult.isJsonPayload;
+
+        console.log(
+          `[SCRAPER_PIPELINE] [RAW_URL]: ${rawUrl} -> [RESOLVED_URL]: ${resolvedUrl} -> [CANONICAL_URL]: ${canonicalUrl} -> [TIER_USED]: ${fetchResult.tierUsed} -> [STATUS]: SUCCESS (${fetchResult.statusCode})`
+        );
+      } catch (fetchErr: any) {
+        // If server-side fetch is blocked by Akamai on Azure Dubai IP, notify client for assist
+        console.warn(`[SCRAPER_WARN] Server fetch blocked for ${canonicalUrl}: ${fetchErr.message}`);
+        return NextResponse.json({
+          success: false,
+          needsClientFetch: true,
+          canonicalUrl: canonicalUrl || rawUrl,
+          platform,
+          productId,
+          error: `Platform edge security restricted server IP for ${platform.toUpperCase()}. Use client-assisted fetch or paste browser cookies.`,
+          status: 'NEEDS_CLIENT_FETCH'
+        }, { status: 200 });
       }
     }
-
-    const fetchResult = await fetchWithFallback(
-      canonicalUrl,
-      platform,
-      productId,
-      optionalAmazonCookie
-    );
-
-    // STRUCTURED LOGGING: [RAW_URL] -> [RESOLVED_URL] -> [CANONICAL_URL] -> [TIER_USED] -> [STATUS]
-    console.log(
-      `[SCRAPER_PIPELINE] [RAW_URL]: ${rawUrl} -> [RESOLVED_URL]: ${resolvedUrl} -> [CANONICAL_URL]: ${canonicalUrl} -> [TIER_USED]: ${fetchResult.tierUsed} -> [STATUS]: SUCCESS (${fetchResult.statusCode})`
-    );
 
     // ------------------------------------------------------------------------
     // STAGE 4: Resilient Data Extraction (JSON-First, DOM-Second)
     // ------------------------------------------------------------------------
-    const parsedData = parseProductData(
-      fetchResult.html,
-      platform,
-      fetchResult.isJsonPayload
+    const parsedData = parseProductData(htmlContent, platform, isJsonPayload);
+
+    const bodySnippet = htmlContent
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .substring(0, 3000);
+
+    const aiResult = await extractWithAi(
+      parsedData.title,
+      parsedData.description,
+      parsedData.rawDetails,
+      bodySnippet
     );
 
-    // Context snippet for AI
-    const bodySnippet = fetchResult.html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
-                                       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
-                                       .replace(/\s+/g, ' ')
-                                       .substring(0, 3500);
-
-    // AI Classification (Gemini 3.8 Flash primary)
-    const geminiApiKey = process.env.GEMINI_API_KEY || '';
-    let aiData: StructuredProductExtraction = {
-      title: '',
-      brand: '',
-      category: '',
-      availableSizes: '',
-      colors: '',
-      clothType: '',
-      occasion: 'casual',
-      description: ''
-    };
-
-    if (geminiApiKey) {
-      try {
-        const geminiResult = await extractWithGemini(geminiApiKey, {
-          title: parsedData.title,
-          description: parsedData.description,
-          extractedDetails: parsedData.rawDetails,
-          bodyText: bodySnippet
-        });
-
-        if (geminiResult) {
-          aiData = {
-            title: geminiResult.title || '',
-            brand: geminiResult.brand || '',
-            category: geminiResult.category || '',
-            availableSizes: geminiResult.availableSizes || '',
-            colors: geminiResult.colors || '',
-            clothType: geminiResult.clothType || '',
-            occasion: (geminiResult.occasion || 'casual').toLowerCase(),
-            description: geminiResult.description || ''
-          };
-        }
-      } catch (geminiErr: any) {
-        console.error('Gemini extraction error:', geminiErr);
-      }
-    }
-
-    // Heuristic Fallback for any missing fields
     const fullTextSearch = `${parsedData.title} ${parsedData.description} ${JSON.stringify(parsedData.rawDetails)}`;
 
-    if (!aiData.brand) {
-      aiData.brand = parsedData.brand || '';
-      if (!aiData.brand) {
-        const brandMatch = parsedData.title.match(/^([A-Za-z0-9&]+)(?:\s+Men|\s+Women|\s+'s|\s+Solid|\s+Regular|\s+Slim|\s+Cotton|\s+Denim)/i);
-        if (brandMatch && brandMatch[1]) aiData.brand = brandMatch[1].trim();
-      }
+    let brand = aiResult?.brand || parsedData.brand || '';
+    if (!brand) {
+      const brandMatch = parsedData.title.match(/^([A-Za-z0-9&]+)(?:\s+Men|\s+Women|\s+'s|\s+Solid|\s+Regular|\s+Slim)/i);
+      if (brandMatch && brandMatch[1]) brand = brandMatch[1].trim();
     }
 
-    if (!aiData.clothType) {
-      const fabricMatch = fullTextSearch.match(/\b(Denim|Cotton Blend|Cotton|Linen|Silk|Georgette|Chiffon|Rayon|Polyester|Satin|Velvet|Crepe|Lycra|Spandex|Elastane|Khadi)\b/i);
+    let clothType = aiResult?.clothType || '';
+    if (!clothType) {
+      const fabricMatch = fullTextSearch.match(/\b(Denim|Cotton Blend|Cotton|Linen|Silk|Georgette|Chiffon|Rayon|Polyester|Satin|Crepe|Lycra)\b/i);
       if (fabricMatch && fabricMatch[1]) {
-        aiData.clothType = fabricMatch[1].charAt(0).toUpperCase() + fabricMatch[1].slice(1).toLowerCase();
+        clothType = fabricMatch[1].charAt(0).toUpperCase() + fabricMatch[1].slice(1).toLowerCase();
       }
     }
 
-    if (!aiData.colors) {
-      const colorMatch = fullTextSearch.match(/\b(Navy Blue|Light Blue|Dark Blue|Blue|Black|White|Grey|Gray|Red|Pink|Yellow|Green|Olive|Brown|Beige|Maroon|Purple|Orange)\b/i);
+    let colors = aiResult?.colors || '';
+    if (!colors) {
+      const colorMatch = fullTextSearch.match(/\b(Navy Blue|Light Blue|Dark Blue|Blue|Black|White|Grey|Red|Pink|Yellow|Green|Olive|Maroon)\b/i);
       if (colorMatch && colorMatch[1]) {
-        aiData.colors = colorMatch[1].charAt(0).toUpperCase() + colorMatch[1].slice(1).toLowerCase();
+        colors = colorMatch[1].charAt(0).toUpperCase() + colorMatch[1].slice(1).toLowerCase();
       }
     }
 
-    if (!aiData.availableSizes) {
+    let availableSizes = aiResult?.availableSizes || '';
+    if (!availableSizes) {
       const sizeMatch = fullTextSearch.match(/[\(,]\s*(?:Size:\s*)?([2-4][0-9]|XXS|XS|S|M|L|XL|[2-8]XL)\s*[\),]/i) ||
                         fullTextSearch.match(/\b(?:size|waist|)\s*([2-4][0-9]|XXS|XS|S|M|L|XL|[2-8]XL)\b/i);
-      if (sizeMatch && sizeMatch[1]) {
-        aiData.availableSizes = sizeMatch[1].toUpperCase();
-      }
+      if (sizeMatch && sizeMatch[1]) availableSizes = sizeMatch[1].toUpperCase();
     }
 
-    if (!aiData.category) {
-      const lowerAll = fullTextSearch.toLowerCase();
-      if (lowerAll.includes('jean') || lowerAll.includes('denim')) aiData.category = 'Jeans';
-      else if (lowerAll.includes('dress')) aiData.category = 'Dresses';
-      else if (lowerAll.includes('kurti') || lowerAll.includes('kurta') || lowerAll.includes('anarkali')) aiData.category = 'Kurtis & Tunics';
-      else if (lowerAll.includes('night') || lowerAll.includes('pyjama') || lowerAll.includes('sleepwear')) aiData.category = 'Nightwear';
-      else if (lowerAll.includes('co-ord') || lowerAll.includes('coord') || lowerAll.includes('set')) aiData.category = 'Co-ord Sets';
-      else if (lowerAll.includes('top') || lowerAll.includes('tee') || lowerAll.includes('shirt') || lowerAll.includes('blouse')) aiData.category = 'Tops';
-      else if (lowerAll.includes('saree') || lowerAll.includes('lehenga') || lowerAll.includes('ethnic')) aiData.category = 'Traditional Wear';
-      else aiData.category = 'Western Wear';
+    let category = aiResult?.category || '';
+    if (!category) {
+      const lower = fullTextSearch.toLowerCase();
+      if (lower.includes('jean') || lower.includes('denim')) category = 'Jeans';
+      else if (lower.includes('dress')) category = 'Dresses';
+      else if (lower.includes('kurti') || lower.includes('kurta')) category = 'Kurtis & Tunics';
+      else if (lower.includes('night') || lower.includes('sleepwear')) category = 'Nightwear';
+      else if (lower.includes('co-ord') || lower.includes('set')) category = 'Co-ord Sets';
+      else if (lower.includes('top') || lower.includes('tee') || lower.includes('shirt')) category = 'Tops';
+      else category = 'Western Wear';
     }
 
-    // Clean up boutique description
-    if (!aiData.description || aiData.description.includes('Amazon.in:') || aiData.description.includes('Robot Check')) {
-      const cleanBrand = aiData.brand || 'This';
-      const cleanCloth = aiData.clothType ? `${aiData.clothType} ` : '';
-      const cleanCat = aiData.category || 'piece';
-      aiData.description = `Elevate your wardrobe with this stylish ${cleanBrand} ${cleanCloth}${cleanCat.toLowerCase()}. Designed for all-day comfort and effortless styling, it offers the perfect balance of fit and fashion.`;
+    let occasion = (aiResult?.occasion || 'casual').toLowerCase();
+    const validOccasions = ['casual', 'formal', 'party', 'ethnic'];
+    if (!validOccasions.includes(occasion)) occasion = 'casual';
+
+    let description = aiResult?.description || parsedData.description || '';
+    if (!description || description.includes('Amazon.in:') || description.includes('Robot Check')) {
+      const cBrand = brand || 'This';
+      const cCloth = clothType ? `${clothType} ` : '';
+      const cCat = category || 'piece';
+      description = `Elevate your wardrobe with this stylish ${cBrand} ${cCloth}${cCat.toLowerCase()}. Designed for all-day comfort and effortless styling, offering the perfect balance of fit and fashion.`;
     }
 
-    // Clean up title
-    let finalTitle = aiData.title || parsedData.title;
+    let finalTitle = aiResult?.title || parsedData.title || '';
     finalTitle = finalTitle
       .replace(/\bLool\b/g, 'Look')
       .replace(/\|+/g, ' - ')
@@ -277,23 +274,24 @@ export async function POST(req: Request) {
       .trim();
 
     return NextResponse.json({
+      success: true,
       title: finalTitle,
-      price: parsedData.price,
+      price: parsedData.price || '0',
       originalPrice: parsedData.originalPrice || undefined,
-      description: aiData.description,
-      images: parsedData.images,
-      inStock: parsedData.inStock,
-      brand: aiData.brand || '',
-      category: aiData.category || '',
-      availableSizes: aiData.availableSizes || '',
-      colors: aiData.colors || '',
-      clothType: aiData.clothType || '',
-      occasion: aiData.occasion || 'casual',
+      description,
+      images: parsedData.images || [],
+      inStock: parsedData.inStock ?? true,
+      brand,
+      category,
+      availableSizes,
+      colors,
+      clothType,
+      occasion,
       debug: {
         rawUrl,
         resolvedUrl,
         canonicalUrl,
-        tierUsed: fetchResult.tierUsed,
+        tierUsed,
         status: 'SUCCESS'
       }
     });
@@ -301,8 +299,9 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error('[SCRAPER_ERROR]', error);
     return NextResponse.json({
+      success: false,
       error: error.message || 'Scraping failed',
       status: 'FAILED'
-    }, { status: 500 });
+    }, { status: 200 });
   }
 }
