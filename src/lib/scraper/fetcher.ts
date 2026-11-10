@@ -270,5 +270,27 @@ export async function fetchWithFallback(
     } catch (proxyErr) {}
   }
 
+  // 3D. Residential / Custom Proxy Fallback (e.g. for datacenter unblocking)
+  const customProxy = process.env.RESIDENTIAL_PROXY_URL || process.env.PROXY_URL;
+  if (customProxy) {
+    try {
+      const res = await gotScraping({
+        url: canonicalUrl,
+        proxyUrl: customProxy,
+        headers: { ...DESKTOP_CHROME_HEADERS },
+        timeout: { request: 15000 }
+      });
+
+      if (res.statusCode === 200 && !isBotBlocked(res.body)) {
+        return {
+          html: res.body,
+          tierUsed: 'TIER_3_API_FALLBACK',
+          statusCode: 200,
+          finalUrl: res.url || canonicalUrl
+        };
+      }
+    } catch (customProxyErr) {}
+  }
+
   throw new Error(`Failed to retrieve page for ${canonicalUrl} across all 3 tiers.`);
 }
