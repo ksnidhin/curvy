@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>1-Click All Cookie Fetcher</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      width: 360px;
+      padding: 16px;
+      background: #f8fafc;
+      color: #0f172a;
+      font-size: 13px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tag {
+      font-size: 10px;
+      background: #3b82f6;
+      color: white;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .hero-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      padding: 14px 12px;
+      border-radius: 10px;
+      border: none;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+      transition: all 0.15s ease;
+      margin-bottom: 12px;
+    }
+    .hero-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(16, 185, 129, 0.45);
+    }
+    .hero-btn:active {
+      transform: translateY(1px);
+    }
+    .hero-btn.copied {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+    }
+    .stats-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+    }
+    .stats-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .store-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .store-pill {
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+    .store-pill .name {
+      font-weight: 500;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .store-pill .count {
+      font-weight: 700;
+      color: #10b981;
+      font-size: 11px;
+    }
+    .store-pill .count.zero {
+      color: #94a3b8;
+    }
+    .format-selector {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .format-btn {
+      flex: 1;
+      padding: 6px 8px;
+      background: white;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .format-btn.active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: white;
+    }
+    .secondary-btn {
+      width: 100%;
+      background: white;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      margin-bottom: 10px;
+    }
+    .secondary-btn:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+    }
+    .sync-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .sync-card label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+    .sync-card input {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+    .toast {
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      text-align: center;
+      font-weight: 600;
+      display: none;
+      margin-bottom: 10px;
+    }
+    .toast-success {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+      display: block;
+    }
+    .toast-error {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>⚡ 1-Click Cookie Fetcher</h1>
+    <span class="tag">Curvy</span>
+  </div>
+
+  <div id="toastMsg" class="toast"></div>
+
+  <!-- Hero 1-Click Button -->
+  <button id="btnFetchAll" class="hero-btn">
+    <span>⚡ FETCH & COPY ALL COOKIES</span>
+  </button>
+
+  <div class="format-selector">
+    <button id="fmtJson" class="format-btn active">Curvy JSON (Recommended)</button>
+    <button id="fmtText" class="format-btn">Plain Text</button>
+  </div>
+
+  <!-- Detected Stores Grid -->
+  <div class="stats-card">
+    <div class="stats-header">
+      <span>Available Stores Detected</span>
+      <span id="totalBadge" style="color: #10b981; font-weight: 700;">Scanning...</span>
+    </div>
+    <div class="store-grid" id="storeGrid">
+      <!-- Populated by popup.js -->
+    </div>
+  </div>
+
+  <!-- Secondary: Current Tab Only -->
+  <button id="btnCopyCurrentTab" class="secondary-btn">
+    <span>🌐 Copy Current Tab Cookies Only</span>
+  </button>
+
+  <!-- Direct Sync to Server -->
+  <div class="sync-card">
+    <label for="curvyUrl">Direct Sync to Curvy Admin Server:</label>
+    <input type="url" id="curvyUrl" placeholder="https://your-domain.com or http://localhost:3000" />
+    <button id="btnSyncServer" class="secondary-btn" style="margin-bottom: 0; background: #0f172a; color: white; border: none;">
+      🚀 1-Click Sync All to Server
+    </button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

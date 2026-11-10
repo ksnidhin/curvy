@@ -1,10 +1,55 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 
-function parseCookieInput(rawCookie?: string | null): string {
+function parseCookieInput(rawCookie?: string | null, targetUrl?: string): string {
   if (!rawCookie || !rawCookie.trim()) return '';
   const trimmed = rawCookie.trim();
-  // Support JSON format exported from Cookie-Editor extension (array of cookie objects)
+
+  // 1. Support JSON object containing multiple stores: { amazon: "...", myntra: "..." }
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const obj = JSON.parse(trimmed);
+      if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
+        if (targetUrl) {
+          const lower = targetUrl.toLowerCase();
+          if ((lower.includes('amazon') || lower.includes('amzn')) && obj.amazon) return obj.amazon;
+          if (lower.includes('myntra') && obj.myntra) return obj.myntra;
+          if (lower.includes('flipkart') && obj.flipkart) return obj.flipkart;
+          if (lower.includes('ajio') && obj.ajio) return obj.ajio;
+          if (lower.includes('meesho') && obj.meesho) return obj.meesho;
+          if (lower.includes('tatacliq') && obj.tatacliq) return obj.tatacliq;
+          if (lower.includes('nykaa') && obj.nykaa) return obj.nykaa;
+          if (obj.custom) return obj.custom;
+          for (const key of Object.keys(obj)) {
+            if (lower.includes(key.toLowerCase()) && typeof obj[key] === 'string') {
+              return obj[key];
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Support block-delimited format (=== AMAZON ===)
+  if (trimmed.includes('===') && targetUrl) {
+    const lower = targetUrl.toLowerCase();
+    let currentStore = '';
+    const lines = trimmed.split('\n');
+    let matchedCookies: string[] = [];
+    for (const line of lines) {
+      const t = line.trim();
+      if (t.startsWith('===') && t.endsWith('===')) {
+        currentStore = t.replace(/=/g, '').trim().toLowerCase();
+        continue;
+      }
+      if (currentStore && lower.includes(currentStore) && t) {
+        matchedCookies.push(t);
+      }
+    }
+    if (matchedCookies.length) return matchedCookies.join('; ');
+  }
+
+  // 3. Support JSON format exported from Cookie-Editor extension (array of cookie objects)
   if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
     try {
       const arr = JSON.parse(trimmed);
@@ -16,6 +61,7 @@ function parseCookieInput(rawCookie?: string | null): string {
       }
     } catch {}
   }
+
   return trimmed;
 }
 
@@ -33,7 +79,8 @@ async function getStoredCookies(): Promise<Record<string, string>> {
 
 async function resolveCookiesForUrl(url: string, explicitCookies?: string): Promise<string> {
   if (explicitCookies && explicitCookies.trim()) {
-    return parseCookieInput(explicitCookies);
+    const parsed = parseCookieInput(explicitCookies, url);
+    if (parsed) return parsed;
   }
 
   const stored = await getStoredCookies();
@@ -59,7 +106,7 @@ async function resolveCookiesForUrl(url: string, explicitCookies?: string): Prom
     cookie = stored.custom || process.env.CUSTOM_COOKIES || '';
   }
 
-  return parseCookieInput(cookie);
+  return parseCookieInput(cookie, url);
 }
 
 export async function POST(req: Request) {

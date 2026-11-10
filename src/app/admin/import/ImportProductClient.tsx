@@ -15,6 +15,17 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
   // We use this to force the form to remount and re-read defaultValues when data is fetched
   const [formKey, setFormKey] = useState(0);
 
+  const detectedStores = React.useMemo(() => {
+    if (!customCookies.trim()) return [];
+    try {
+      if (customCookies.trim().startsWith('{') && customCookies.trim().endsWith('}')) {
+        const obj = JSON.parse(customCookies.trim());
+        return Object.keys(obj).filter(k => typeof obj[k] === 'string' && obj[k].trim().length > 0 && k !== 'updatedAt');
+      }
+    } catch {}
+    return [];
+  }, [customCookies]);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem('curvy_supplier_cookies');
@@ -124,11 +135,15 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
               className="text-xs font-medium text-sage hover:underline flex items-center gap-1.5 focus:outline-none"
             >
               <span>{showCookies ? '▼ Hide Session Cookies' : '▶ Personal PC Cookies (Bypass Bot Check)'}</span>
-              {customCookies.trim() && (
+              {detectedStores.length > 0 ? (
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-100 text-green-800 font-semibold">
+                  {detectedStores.length} Stores Synced ({detectedStores.join(', ')})
+                </span>
+              ) : customCookies.trim() ? (
                 <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-100 text-green-800 font-semibold">
                   Cookies Active
                 </span>
-              )}
+              ) : null}
             </button>
 
             {showCookies && (

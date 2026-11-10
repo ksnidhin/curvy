@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "1-Click All Cookie Fetcher",
+  "version": "1.0.0",
+  "description": "Fetch and copy all available cookies from Amazon, Myntra, Flipkart, Ajio, Meesho and more with one click.",
+  "permissions": [
+    "cookies",
+    "activeTab",
+    "clipboardWrite",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "1-Click Cookie Fetcher"
+  }
+}

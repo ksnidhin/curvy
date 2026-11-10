@@ -127,6 +127,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Handle Copy All Stores Cookies At Once
+  const btnCopyAllStores = document.getElementById('btnCopyAllStores');
+  if (btnCopyAllStores) {
+    btnCopyAllStores.addEventListener('click', async () => {
+      const payload = {};
+      let storeCount = 0;
+      for (const store of STORES) {
+        const cookies = storeCookiesCache[store.id] || (await getCookiesForStore(store));
+        if (cookies) {
+          payload[store.id] = cookies;
+          storeCount++;
+        }
+      }
+      const jsonString = JSON.stringify(payload, null, 2);
+      navigator.clipboard.writeText(jsonString).then(() => {
+        const orig = btnCopyAllStores.textContent;
+        btnCopyAllStores.textContent = `Copied All (${storeCount} Stores)! ✓`;
+        btnCopyAllStores.style.background = '#15803d';
+        setTimeout(() => {
+          btnCopyAllStores.textContent = orig;
+        }, 2000);
+      });
+    });
+  }
+
   // Handle 1-Click Server Sync
   btnSyncServer.addEventListener('click', async () => {
     const targetUrl = curvyUrlInput.value.trim().replace(/\/$/, '');
