@@ -1,12 +1,12 @@
 import { gotScraping } from 'got-scraping';
 
 async function testWithTunnel(platform, url) {
-  console.log(`\nTesting ${platform}: ${url} through residential tunnel...`);
+  console.log(`\nTesting ${platform}: ${url} through residential HTTP tunnel (127.0.0.1:8888)...`);
   try {
     const res = await gotScraping({
       url,
       method: 'GET',
-      proxyUrl: 'socks5://127.0.0.1:1080',
+      proxyUrl: 'http://127.0.0.1:8888',
       headerGeneratorOptions: {
         browsers: [{ name: 'chrome' }],
         devices: ['desktop'],
@@ -19,9 +19,12 @@ async function testWithTunnel(platform, url) {
         'sec-fetch-mode': 'navigate',
         'sec-fetch-site': 'none'
       },
-      timeout: { request: 12000 }
+      timeout: { request: 15000 }
     });
     console.log(`${platform} Status: ${res.statusCode}, Length: ${res.body.length}`);
+    console.log(`Is Site Maintenance: ${res.body.includes('Site Maintenance')}`);
+    console.log(`Is Access Denied: ${res.body.includes('Access Denied')}`);
+    console.log(`Title: ${res.body.match(/<title>(.*?)<\/title>/i)?.[1]}`);
     console.log(`Preview: ${res.body.substring(0, 150)}`);
     return { ok: true, status: res.statusCode, len: res.body.length };
   } catch (err) {
