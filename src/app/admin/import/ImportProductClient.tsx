@@ -73,6 +73,36 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
         derivedStore = derivedStore.charAt(0).toUpperCase() + derivedStore.slice(1);
       } catch(e) {}
       
+      let matchedCategorySlug = '';
+      if (data.category) {
+        const catClean = data.category.toLowerCase().trim();
+        const found = categories.find(c => 
+          c.name.toLowerCase() === catClean ||
+          c.slug.toLowerCase() === catClean ||
+          catClean.includes(c.name.toLowerCase()) ||
+          c.name.toLowerCase().includes(catClean)
+        );
+        if (found) matchedCategorySlug = found.slug;
+      }
+
+      const rawOccasion = (data.occasion || 'casual').toLowerCase().trim();
+      const validOccasions = ['casual', 'formal', 'party', 'ethnic'];
+      const occasion = validOccasions.includes(rawOccasion) ? rawOccasion : 'casual';
+
+      let availableSizes: string[] = [];
+      if (Array.isArray(data.availableSizes)) {
+        availableSizes = data.availableSizes.map(String).map((s: string) => s.trim()).filter(Boolean);
+      } else if (typeof data.availableSizes === 'string' && data.availableSizes.trim()) {
+        availableSizes = data.availableSizes.split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+
+      let colors: string[] = [];
+      if (Array.isArray(data.colors)) {
+        colors = data.colors.map(String).map((s: string) => s.trim()).filter(Boolean);
+      } else if (typeof data.colors === 'string' && data.colors.trim()) {
+        colors = data.colors.split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+
       const scrapedProduct = {
         title: data.title || '',
         description: data.description || '',
@@ -80,12 +110,12 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
         affiliateUrl: fetchUrl,
         storeName: derivedStore || '',
         brand: data.brand || '',
-        categorySlug: categories.find(c => c.name.toLowerCase() === (data.category || '').toLowerCase())?.slug || '',
+        categorySlug: matchedCategorySlug || categories[0]?.slug || '',
         attributes: {
-          colors: data.colors ? data.colors.split(',').map((s: string) => s.trim()) : [],
-          availableSizes: data.availableSizes ? data.availableSizes.split(',').map((s: string) => s.trim()) : [],
+          colors,
+          availableSizes,
           clothType: data.clothType || '',
-          occasion: data.occasion || ''
+          occasion
         },
         images: (data.images || []).map((url: string) => ({ url })) // MinimalProductForm handles strings/objects
       };
@@ -168,7 +198,7 @@ export function ImportProductClient({ categories }: { categories: Category[] }) 
                   className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs focus:ring-sage focus:border-sage"
                 />
                 <p className="text-gray-500 text-[11px] leading-relaxed">
-                  💡 <strong>How to get cookies from your PC:</strong> On Amazon or Myntra in Chrome, press <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">F12</kbd> → <strong>Network</strong> tab → click any request to the site → right-click <strong>Cookie</strong> in Request Headers → <strong>Copy value</strong>. Cookies are automatically saved in your browser for future imports.
+                  ðŸ’¡ <strong>How to get cookies from your PC:</strong> On Amazon or Myntra in Chrome, press <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">F12</kbd> â†’ <strong>Network</strong> tab â†’ click any request to the site â†’ right-click <strong>Cookie</strong> in Request Headers â†’ <strong>Copy value</strong>. Cookies are automatically saved in your browser for future imports.
                 </p>
               </div>
             )}

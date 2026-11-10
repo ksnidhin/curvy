@@ -109,12 +109,120 @@ async function resolveCookiesForUrl(url: string, explicitCookies?: string): Prom
   return parseCookieInput(cookie, url);
 }
 
+interface StructuredProductExtraction {
+  title?: string;
+  brand?: string;
+  category?: string;
+  availableSizes?: string;
+  colors?: string;
+  clothType?: string;
+  occasion?: string;
+  description?: string;
+}
+
+async function extractWithGemini(
+  apiKey: string,
+  raw: {
+    title: string;
+    description: string;
+    extractedDetails: Record<string, any>;
+    bodyText: string;
+  }
+): Promise<StructuredProductExtraction | null> {
+  // Primary model: gemini-3.8-flash (as requested by user), with robust fallbacks
+  const models = [
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-3.5-flash',
+    'gemini-2.5-flash',
+    'gemini-flash-latest'
+  ];
+
+  const prompt = `You are an expert e-commerce catalog assistant for the fashion brand "Curvygirls".
+We have scraped product data from a retailer page. Analyze the raw data and accurately categorize, clean, and map all fields to fit our clean database schema.
+
+RAW PRODUCT DATA:
+- Scraped Title: ${raw.title}
+- Scraped Description/Bullets: ${raw.description}
+- Extracted Details: ${JSON.stringify(raw.extractedDetails)}
+- Page Snippet: ${raw.bodyText.substring(0, 3000)}
+
+ALLOWED CATEGORIES (Pick EXACTLY ONE from this list):
+["Co-ord Sets", "Dresses", "Jeans", "Kurtis & Tunics", "Nightwear", "Tops", "Traditional Wear", "Western Wear", "Wrap tops"]
+(Guidelines: Any jeans, denim trousers, or jeggings MUST be categorized as "Jeans". Any kurtas, kurtis, anarkalis MUST be "Kurtis & Tunics". Nightgowns, pyjama sets, sleepwear MUST be "Nightwear". Two-piece matching sets MUST be "Co-ord Sets". Western shirts/t-shirts/blouses MUST be "Tops" or "Western Wear". Sarees, lehengas, dupattas MUST be "Traditional Wear".)
+
+ALLOWED OCCASIONS (Pick EXACTLY ONE from this list):
+["casual", "formal", "party", "ethnic"]
+
+EXTRACTION & CLEANING RULES:
+1. "title": A clean, appealing product title without seller SEO spam, pipe characters ("|"), or typos (e.g. fix "Lool" -> "Look", remove "Amazon.in: Fashion", remove "(Blue, 32)"). Max 70 characters.
+2. "brand": Brand name (e.g. "KOTTY"). Extract from title or details.
+3. "category": Pick ONE EXACT category from the ALLOWED CATEGORIES list above.
+4. "availableSizes": Comma-separated list of sizes (e.g. "28, 30, 32, 34, 36" for jeans/pants, or "S, M, L, XL" for tops/dresses). Strip units like "inches", "waist", "size". If variations or sizes were found in the details or title, include all available sizes.
+5. "colors": Comma-separated primary clean color names (e.g. "Blue" or "Dark Blue").
+6. "clothType": Fabric or material composition (e.g. "Denim", "Cotton", "Cotton Blend", "Georgette", "Polyester", "Rayon").
+7. "occasion": ONE from the ALLOWED OCCASIONS list (lowercase: "casual", "formal", "party", or "ethnic").
+8. "description": An attractive, clean, boutique-style product description (2 to 4 sentences) written in an engaging tone. Highlight the fit, style, and fabric comfort. DO NOT include raw dumped specs, bullet points, retailer names, or seller noise.
+
+Respond strictly with a valid JSON object matching this schema:
+{
+  "title": "Clean Product Title",
+  "brand": "Brand Name",
+  "category": "Jeans",
+  "availableSizes": "28, 30, 32, 34, 36",
+  "colors": "Blue",
+  "clothType": "Denim",
+  "occasion": "casual",
+  "description": "Clean attractive product description."
+}`;
+
+  for (const model of models) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.1
+          }
+        })
+      });
+      clearTimeout(timeout);
+
+      if (res.ok) {
+        const data = await res.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (rawText) {
+          const parsed = JSON.parse(rawText.trim());
+          console.log(`[Scraper] Successfully extracted fields with Gemini model: ${model}`);
+          return parsed;
+        }
+      } else {
+        const errText = await res.text().catch(() => '');
+        console.warn(`[Scraper] Gemini model ${model} failed (${res.status}): ${errText.substring(0, 100)}`);
+      }
+    } catch (err: any) {
+      console.warn(`[Scraper] Gemini model ${model} exception: ${err.message}`);
+    }
+  }
+
+  return null;
+}
+
 export async function POST(req: Request) {
   try {
     const { url, cookies: reqCookies } = await req.json();
     if (!url) return NextResponse.json({ error: 'URL is required' }, { status: 400 });
 
     const scraperApiKey = process.env.SCRAPERAPI_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY || '';
     const groqApiKey = process.env.GROQ_API_KEY;
     
     const userCookie = await resolveCookiesForUrl(url, reqCookies);
@@ -184,7 +292,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Step 2: Fallback to ScraperAPI (with forward headers) or direct fetch if no HTML obtained yet
+    // Step 2: Fallback to ScraperAPI or direct fetch if no HTML obtained yet
     if (!html) {
       let fetchUrl = finalUrl;
       const headersToSend = { ...browserHeaders };
@@ -214,7 +322,6 @@ export async function POST(req: Request) {
     let images: string[] = [];
     let extractedDetails: any = {};
     
-    // We parse the original URL domain, not scraperapi's domain
     const domain = new URL(finalUrl).hostname;
 
     if (domain.includes('amazon') || domain.includes('amzn')) {
@@ -227,11 +334,52 @@ export async function POST(req: Request) {
       price = priceWhole;
       description = $('#productDescription').text().trim() || $('#feature-bullets').text().trim() || $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
       
-      // Extract specific Amazon details for the AI
-      const amznDetails = $('#productDetails_techSpec_section_1, #detailBullets_feature_div').text().replace(/\s+/g, ' ').trim();
-      extractedDetails.amazonRaw = {
+      // Amazon brand extraction
+      const brandCandidate = $('.po-brand .po-break-word').first().text().trim() ||
+                              $('#bylineInfo').text().replace(/Visit the\s+|Brand:\s+|Store/gi, '').trim() ||
+                              $('#bylineInfo_feature_div').text().replace(/Visit the\s+|Brand:\s+|Store/gi, '').trim();
+
+      // Amazon material/fabric extraction
+      const materialCandidate = $('.po-material .po-break-word').first().text().trim() ||
+                                $('.po-fabric .po-break-word').first().text().trim() ||
+                                $('#productOverview_feature_div tr.po-material_composition td.a-span9 span').text().trim();
+
+      // Amazon color extraction
+      const colorCandidate = $('#variation_color_name .selection').text().trim() ||
+                             $('.po-color .po-break-word').first().text().trim();
+
+      // Amazon size variations extraction
+      const amznSizes: string[] = [];
+      const selectedSize = $('#variation_size_name .selection').text().trim();
+      if (selectedSize) amznSizes.push(selectedSize);
+
+      $('#variation_size_name ul li, #variation_size_name select option, #native_dropdown_selected_size_name option, select#dropdown_selected_size_name option').each((_, el) => {
+        const txt = $(el).text().replace(/select/i, '').trim();
+        if (txt && !txt.toLowerCase().includes('select') && txt.length < 25) {
+          amznSizes.push(txt);
+        }
+      });
+
+      // Also check title for size indicators (e.g., "(Blue, 32)")
+      const titleSizeMatch = title.match(/\b(?:size|waist|)\s*([2-4][0-9]|XXS|XS|S|M|L|XL|[2-8]XL)\b/i);
+      if (titleSizeMatch && titleSizeMatch[1]) {
+        amznSizes.push(titleSizeMatch[1]);
+      }
+
+      // Breadcrumbs for category detection
+      const breadcrumbs = $('#wayfinding-breadcrumbs_feature_div').text().replace(/\s+/g, ' ').trim();
+      const productOverview = $('#productOverview_feature_div').text().replace(/\s+/g, ' ').trim();
+      const amznSpecs = $('#productDetails_techSpec_section_1, #detailBullets_feature_div').text().replace(/\s+/g, ' ').trim();
+      
+      extractedDetails.amazon = {
+        brand: brandCandidate,
+        material: materialCandidate,
+        color: colorCandidate,
+        sizes: [...new Set(amznSizes)].join(', '),
+        breadcrumbs,
+        overview: productOverview,
         features: $('#feature-bullets').text().replace(/\s+/g, ' ').trim(),
-        specs: amznDetails
+        specs: amznSpecs
       };
       
       // Try finding high-res images in the DOM
@@ -265,9 +413,27 @@ export async function POST(req: Request) {
       price = $('._30jeq3').first().text().replace(/[^0-9]/g, '') || $('.Nx9bqj').first().text().replace(/[^0-9]/g, '');
       description = $('._1mXcCf').text().trim() || $('meta[property="og:description"]').attr('content') || '';
       
+      const flipkartBrand = $('span.G6XhRU, .mEh187').first().text().trim();
+      const flipkartSizes: string[] = [];
+      $('._1fGeJ5, .CDDvd_ li, ul._1q8vST li').each((_, el) => {
+        const txt = $(el).text().trim();
+        if (txt) flipkartSizes.push(txt);
+      });
+      const flipkartColor = $('._3V2wfe').first().text().trim();
+      const flipkartSpecs = $('table._14cfVK').text().replace(/\s+/g, ' ').trim();
+      const flipkartBreadcrumbs = $('._1MR4o5').text().replace(/\s+/g, ' ').trim();
+
+      extractedDetails.flipkart = {
+        brand: flipkartBrand,
+        sizes: [...new Set(flipkartSizes)].join(', '),
+        color: flipkartColor,
+        specs: flipkartSpecs,
+        breadcrumbs: flipkartBreadcrumbs
+      };
+
       $('img._396cs4, img._2r_T1I, img.DByuf4').each((_, el) => {
         const src = $(el).attr('src');
-        if (src) images.push(src.replace('128/128', '832/832').replace('128/128', '832/832'));
+        if (src) images.push(src.replace('128/128', '832/832'));
       });
       const ogImage = $('meta[property="og:image"]').attr('content');
       if (ogImage) images.push(ogImage);
@@ -300,9 +466,11 @@ export async function POST(req: Request) {
                 price = product.price.discounted.toString();
               }
               
-              extractedDetails.myntraRaw = {
+              extractedDetails.myntra = {
                 brand: product.brand,
-                sizes: product.sizes,
+                sizes: Array.isArray(product.sizes) ? product.sizes.map((s: any) => s.label || s.size).join(', ') : '',
+                color: product.baseColour || '',
+                category: product.articleType?.typeName || '',
                 attributes: product.articleAttributes
               };
             }
@@ -317,7 +485,7 @@ export async function POST(req: Request) {
       
       const possiblePrices = $('.price, [class*="Price"], [class*="pdp-price"], .discounted-price, h4').map((_, el) => $(el).text()).get();
       for (const p of possiblePrices) {
-        if (p.includes('₹')) {
+        if (p.includes('₹') || p.includes('Rs')) {
            const num = p.replace(/[^0-9]/g, '');
            if (num && parseInt(num) > 0) { price = num; break; }
         }
@@ -332,13 +500,15 @@ export async function POST(req: Request) {
           if (detailsData) {
             const productImages = detailsData.images;
             if (Array.isArray(productImages)) {
-              const highResImages = productImages.map((url: string) => url.replace(/_\d+\.(jpg|jpeg|png)$/i, '.$1'));
+              const highResImages = productImages.map((u: string) => u.replace(/_\d+\.(jpg|jpeg|png)$/i, '.$1'));
               images.push(...highResImages);
             }
             
-            extractedDetails.meeshoRaw = {
-              validSizes: detailsData.validSizes,
-              originalDescription: detailsData.description
+            extractedDetails.meesho = {
+              validSizes: Array.isArray(detailsData.validSizes) ? detailsData.validSizes.join(', ') : '',
+              originalDescription: detailsData.description,
+              category: detailsData.category_name || detailsData.catalog_name || '',
+              attributes: detailsData.product_attributes
             };
             if (detailsData.price && detailsData.price > 0 && !price) {
                price = detailsData.price.toString();
@@ -353,6 +523,18 @@ export async function POST(req: Request) {
       description = $('.prod-desc').text().trim() || $('meta[property="og:description"]').attr('content') || '';
       price = $('.prod-sp').text().replace(/[^0-9]/g, '');
       
+      const ajioSizes: string[] = [];
+      $('.size-variant-item, .size-swatch').each((_, el) => {
+        const txt = $(el).text().trim();
+        if (txt) ajioSizes.push(txt);
+      });
+
+      extractedDetails.ajio = {
+        brand: $('.brand-name').first().text().trim(),
+        sizes: [...new Set(ajioSizes)].join(', '),
+        breadcrumbs: $('.breadcrumb').text().replace(/\s+/g, ' ').trim()
+      };
+
       $('img.preview-img, img.prod-img').each((_, el) => {
         const src = $(el).attr('src');
         if (src && src.startsWith('http')) images.push(src);
@@ -387,40 +569,76 @@ export async function POST(req: Request) {
     description = description.replace(/\s+/g, ' ').trim().substring(0, 1500);
     images = [...new Set(images)].slice(0, 5);
     
-    // Extract a larger chunk of text from the body to give the AI more context (for sizes, colors, fabric)
+    // Snippet of page text for extra context
     const bodyText = $('body').text().replace(/\s+/g, ' ').substring(0, 4000);
 
-    // --- GROQ AI EXTRACTION ---
-    let aiData = { brand: '', category: '', availableSizes: '', colors: '', clothType: '', occasion: '' };
-    
-    if (groqApiKey) {
+    // AI Classification Data
+    let aiData: StructuredProductExtraction = {
+      title: '',
+      brand: '',
+      category: '',
+      availableSizes: '',
+      colors: '',
+      clothType: '',
+      occasion: 'casual',
+      description: ''
+    };
+
+    // Step A: Extract with Google Gemini (using gemini-3.8-flash first)
+    if (geminiApiKey) {
+      try {
+        const geminiResult = await extractWithGemini(geminiApiKey, {
+          title,
+          description,
+          extractedDetails,
+          bodyText
+        });
+
+        if (geminiResult) {
+          aiData = {
+            title: geminiResult.title || '',
+            brand: geminiResult.brand || '',
+            category: geminiResult.category || '',
+            availableSizes: geminiResult.availableSizes || '',
+            colors: geminiResult.colors || '',
+            clothType: geminiResult.clothType || '',
+            occasion: (geminiResult.occasion || 'casual').toLowerCase(),
+            description: geminiResult.description || ''
+          };
+        }
+      } catch (geminiErr: any) {
+        console.error('Gemini extraction error:', geminiErr);
+      }
+    }
+
+    // Step B: Secondary fallback to Groq if Gemini did not fill structured fields
+    if ((!aiData.category || !aiData.brand) && groqApiKey) {
       try {
         const Groq = (await import('groq-sdk')).default;
         const groq = new Groq({ apiKey: groqApiKey });
         
-        const prompt = `You are an expert fashion e-commerce data extraction assistant. We have scraped raw data from a product page.
-I need you to carefully extract the exact details to fit strictly into our clean database schema.
-DO NOT summarize or dump remaining data. ONLY extract what is asked for.
-
-Raw Data Dump:
+        const prompt = `You are an expert fashion e-commerce catalog assistant.
+Categorize this product strictly to fit our schema.
 Title: ${title}
 Description: ${description}
-Raw JSON/Metadata extracted: ${JSON.stringify(extractedDetails)}
-Raw Page Text (snippet): ${bodyText}
+Details: ${JSON.stringify(extractedDetails)}
 
-Please parse this raw data and return ONLY a valid JSON object with the exact keys below. Do not include markdown formatting or backticks.
+Categories allowed: ["Co-ord Sets", "Dresses", "Jeans", "Kurtis & Tunics", "Nightwear", "Tops", "Traditional Wear", "Western Wear", "Wrap tops"]
+Occasions allowed: ["casual", "formal", "party", "ethnic"]
+
+Return ONLY a JSON object:
 {
-  "brand": "Extract the brand name. Return empty string if unknown.",
-  "category": "Extract or guess the best category from: Co-ord Sets, Dresses, Jeans, Kurtis & Tunics, Nightwear, Tops, Traditional Wear, Western Wear, Wrap tops. Return empty string if unsure.",
-  "availableSizes": "Extract all available sizes (e.g. S, M, L, XL, 6-12M, 28, 30) and return them as a comma-separated string. Look carefully at the JSON metadata for validSizes or sizes array.",
-  "colors": "Extract the base color(s) of the product and return as a comma-separated string. Look closely at the JSON metadata for color fields.",
-  "clothType": "Extract the fabric or material type (e.g. Cotton, Polyester, Georgette). Look closely at the JSON metadata for fabric fields.",
-  "occasion": "Guess the best occasion from: Casual, Formal, Party, Ethnic. Return Casual if unsure."
+  "title": "Clean concise title",
+  "brand": "Brand name",
+  "category": "One category from allowed list",
+  "availableSizes": "Comma-separated sizes (e.g. 28, 30, 32 or S, M, L)",
+  "colors": "Comma-separated colors",
+  "clothType": "Fabric or material",
+  "occasion": "casual or formal or party or ethnic",
+  "description": "Attractive 2-3 sentence product description"
 }`;
 
-        let aiResponse = '{}';
-        const modelsToTry = ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'llama3-70b-8192', 'llama-3.1-8b-instant'];
-        
+        const modelsToTry = ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
         for (const model of modelsToTry) {
           try {
             const chatCompletion = await groq.chat.completions.create({
@@ -429,34 +647,75 @@ Please parse this raw data and return ONLY a valid JSON object with the exact ke
               temperature: 0.1,
               response_format: { type: 'json_object' }
             });
-            aiResponse = chatCompletion.choices[0]?.message?.content || '{}';
-            if (aiResponse && aiResponse !== '{}') break;
-          } catch (modelErr: any) {
-            console.warn(`Groq model ${model} failed, trying next:`, modelErr.message);
-          }
+            const text = chatCompletion.choices[0]?.message?.content || '{}';
+            const parsed = JSON.parse(text);
+            if (parsed.category || parsed.brand) {
+              aiData = {
+                title: parsed.title || aiData.title,
+                brand: parsed.brand || aiData.brand,
+                category: parsed.category || aiData.category,
+                availableSizes: parsed.availableSizes || aiData.availableSizes,
+                colors: parsed.colors || aiData.colors,
+                clothType: parsed.clothType || aiData.clothType,
+                occasion: (parsed.occasion || aiData.occasion || 'casual').toLowerCase(),
+                description: parsed.description || aiData.description
+              };
+              break;
+            }
+          } catch (modelErr) {}
         }
-        
-        const parsed = JSON.parse(aiResponse);
-        
-        aiData = {
-          brand: parsed.brand || '',
-          category: parsed.category || '',
-          availableSizes: parsed.availableSizes || '',
-          colors: parsed.colors || '',
-          clothType: parsed.clothType || '',
-          occasion: parsed.occasion?.toLowerCase() || ''
-        };
-      } catch(err) {
-        console.error("Groq AI Error:", err);
+      } catch (groqErr) {
+        console.error('Groq fallback error:', groqErr);
       }
     }
 
+    // Step C: Fallback to raw extracted details if still empty
+    if (!aiData.brand) {
+      aiData.brand = extractedDetails.amazon?.brand ||
+                     extractedDetails.flipkart?.brand ||
+                     extractedDetails.myntra?.brand ||
+                     extractedDetails.ajio?.brand || '';
+    }
+
+    if (!aiData.clothType) {
+      aiData.clothType = extractedDetails.amazon?.material || '';
+    }
+
+    if (!aiData.colors) {
+      aiData.colors = extractedDetails.amazon?.color ||
+                      extractedDetails.flipkart?.color ||
+                      extractedDetails.myntra?.color || '';
+    }
+
+    if (!aiData.availableSizes) {
+      aiData.availableSizes = extractedDetails.amazon?.sizes ||
+                              extractedDetails.flipkart?.sizes ||
+                              extractedDetails.myntra?.sizes ||
+                              extractedDetails.meesho?.validSizes ||
+                              extractedDetails.ajio?.sizes || '';
+    }
+
+    if (!aiData.category) {
+      const lowerAll = (title + ' ' + (extractedDetails.amazon?.breadcrumbs || '')).toLowerCase();
+      if (lowerAll.includes('jean') || lowerAll.includes('denim')) aiData.category = 'Jeans';
+      else if (lowerAll.includes('dress')) aiData.category = 'Dresses';
+      else if (lowerAll.includes('kurti') || lowerAll.includes('kurta')) aiData.category = 'Kurtis & Tunics';
+      else if (lowerAll.includes('night') || lowerAll.includes('pyjama') || lowerAll.includes('sleep')) aiData.category = 'Nightwear';
+      else if (lowerAll.includes('co-ord') || lowerAll.includes('coord') || lowerAll.includes('set')) aiData.category = 'Co-ord Sets';
+      else if (lowerAll.includes('top') || lowerAll.includes('tee') || lowerAll.includes('shirt')) aiData.category = 'Tops';
+    }
+
     return NextResponse.json({
-      title,
+      title: aiData.title || title,
       price,
-      description,
+      description: aiData.description || description,
       images,
-      ...aiData
+      brand: aiData.brand || '',
+      category: aiData.category || '',
+      availableSizes: aiData.availableSizes || '',
+      colors: aiData.colors || '',
+      clothType: aiData.clothType || '',
+      occasion: aiData.occasion || 'casual'
     });
 
   } catch (error: any) {

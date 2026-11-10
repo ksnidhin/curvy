@@ -218,7 +218,7 @@ export function MinimalProductForm({ initialData, categories = [] }: MinimalProd
                 type="text"
                 name="colors"
                 placeholder="Red, Blue, Black"
-                defaultValue={initialData?.attributes?.colors?.join(', ')}
+                defaultValue={Array.isArray(initialData?.attributes?.colors) ? initialData.attributes.colors.join(', ') : (initialData?.attributes?.colors || '')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-sage focus:border-sage"
               />
             </div>

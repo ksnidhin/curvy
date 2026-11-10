@@ -21,6 +21,11 @@
 /build
 
 # misc
+# Local admin SSH scripts
+askpass.cmd
+askpass.js
+run-vps.ps1
+
 .DS_Store
 *.pem
 
