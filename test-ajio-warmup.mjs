@@ -15,21 +15,21 @@ async function testAjio() {
     });
     console.log('Homepage warmed up, cookies in jar:', await jar.getCookies('https://www.ajio.com/'));
 
-    // 2. Product fetch
+    // 2. Product API fetch with warmed-up cookies
     const res = await gotScraping({
-      url: 'https://www.ajio.com/kotty-men-washed-slim-fit-jeans/p/466579899_blue',
+      url: 'https://www.ajio.com/api/p/466579899_blue',
       method: 'GET',
       proxyUrl: 'http://127.0.0.1:8888',
       cookieJar: jar,
       headers: {
-        'referer': 'https://www.ajio.com/',
-        'sec-fetch-site': 'same-origin'
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://www.ajio.com/'
       },
       timeout: { request: 12000 }
     });
-    console.log(`Ajio Status: ${res.statusCode}, len: ${res.body.length}`);
-    console.log(`Title: ${res.body.match(/<title>(.*?)<\/title>/i)?.[1]}`);
-    console.log(`Has __PRELOADED_STATE__: ${res.body.includes('__PRELOADED_STATE__')}`);
+    console.log(`Ajio API Status: ${res.statusCode}, len: ${res.body.length}`);
+    console.log(`Preview: ${res.body.substring(0, 300)}`);
   } catch (e) {
     console.log(`Error: ${e.message}, status: ${e.response?.statusCode}`);
   }
