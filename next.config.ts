@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   // For Next.js 15+
-  serverExternalPackages: [],
+  serverExternalPackages: ['got-scraping', 'header-generator', 'http2-wrapper', 'tough-cookie'],
   serverActions: {
     bodySizeLimit: '50mb',
   },
